@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, AlertTriangle, Activity, Brain, ShieldCheck } from "lucide-react";
+import { Mic, MicOff, AlertTriangle, Activity, Brain, ShieldCheck, FileText } from "lucide-react";
+import ReportGenerator from "./ReportGenerator";
 
 interface VectorResult {
   detected: boolean;
@@ -27,6 +28,7 @@ export default function VoiceShield() {
   const [threatLevel, setThreatLevel] = useState(0);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -297,13 +299,19 @@ export default function VoiceShield() {
               className="bg-[#ff003c]/10 border border-[#ff003c]/60 rounded-xl p-4 flex items-start gap-3"
             >
               <AlertTriangle className="w-5 h-5 text-[#ff003c] flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-grow">
                 <h4 className="text-[#ff003c] font-bold font-mono text-xs uppercase tracking-wider">
                   {analysis?.verdict === "CRITICAL" ? "Digital Arrest Scam Detected" : "High Threat Detected"}
                 </h4>
-                <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                <p className="text-gray-400 text-xs mt-1 leading-relaxed mb-3">
                   {analysis?.summary ?? "Multiple manipulation vectors identified. Exercise extreme caution."}
                 </p>
+                <button
+                  onClick={() => setShowReport(true)}
+                  className="bg-[#ff003c] hover:bg-[#ff003c]/80 text-black text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
+                >
+                  <FileText className="w-3 h-3" /> GENERATE NCRB REPORT
+                </button>
               </div>
             </motion.div>
           )}
@@ -370,6 +378,20 @@ export default function VoiceShield() {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showReport && analysis && (
+          <ReportGenerator 
+            source="VoiceShield"
+            threatLevel={threatLevel}
+            data={{
+              transcript,
+              summary: analysis.summary
+            }}
+            onClose={() => setShowReport(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

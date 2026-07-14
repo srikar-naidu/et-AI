@@ -6,6 +6,7 @@ import { ShieldAlert, ScanLine, Link as LinkIcon, Activity } from "lucide-react"
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
+import ChatbotWidget from "@/components/ChatbotWidget";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -95,6 +96,9 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Global Expansion Widgets */}
+      <ChatbotWidget />
     </main>
   );
 }

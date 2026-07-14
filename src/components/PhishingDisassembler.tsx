@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, AlertTriangle, ShieldCheck, Link as LinkIcon, Globe, Clock, Server } from "lucide-react";
+import { Search, AlertTriangle, ShieldCheck, Link as LinkIcon, Globe, Clock, Server, FileText, Network } from "lucide-react";
+import ReportGenerator from "./ReportGenerator";
+import ForceGraph2D from "react-force-graph-2d";
 
-// Mock analysis data based on typical phishing patterns
 const PSYCHOLOGICAL_TRIGGERS = [
   "suspended", "disconnected", "blocked", "urgent", "immediately", "verify", 
   "kyc", "pan", "aadhar", "electricity", "bill", "pending", "claim", "prize"
@@ -26,23 +27,25 @@ export default function PhishingDisassembler() {
   const [inputText, setInputText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
+  
+  // Graph Data
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
 
   const analyzeText = () => {
     if (!inputText.trim()) return;
     
     setIsAnalyzing(true);
     setResult(null);
+    setShowGraph(false);
 
-    // Simulate network delay for API analysis
     setTimeout(() => {
       const lowerText = inputText.toLowerCase();
-      
-      // Extract URL using simple regex
       const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
       const urls = inputText.match(urlRegex);
       const extractedUrl = urls ? urls[0] : null;
 
-      // Calculate risk score based on triggers and URL presence
       let score = 0;
       let triggerCount = 0;
       
@@ -53,7 +56,6 @@ export default function PhishingDisassembler() {
       if (triggerCount > 0) score += Math.min(triggerCount * 20, 50);
       if (extractedUrl) {
         score += 30;
-        // Check for common suspicious TLDs or URL shorteners (mock logic)
         if (extractedUrl.includes(".xyz") || extractedUrl.includes(".tk") || extractedUrl.includes("bit.ly")) {
           score += 20;
         }
@@ -61,7 +63,6 @@ export default function PhishingDisassembler() {
 
       const isPhishing = score > 60;
 
-      // Highlight the triggers in the text
       let highlighted = inputText;
       PSYCHOLOGICAL_TRIGGERS.forEach(trigger => {
         const regex = new RegExp(`\\b${trigger}\\b`, 'gi');
@@ -85,13 +86,31 @@ export default function PhishingDisassembler() {
         highlightedText: highlighted
       });
 
+      // Mock graph data connecting the URL to known threats
+      if (extractedUrl && isPhishing) {
+        setGraphData({
+          nodes: [
+            { id: extractedUrl, group: 1, val: 20, color: "#ff003c", name: "Extracted URL" },
+            { id: "Malicious IP 1", group: 2, val: 10, color: "#00f3ff", name: "Known Phishing Server" },
+            { id: "Malicious IP 2", group: 2, val: 10, color: "#00f3ff", name: "Botnet Node" },
+            { id: "Suspicious TLD", group: 3, val: 15, color: "orange", name: "High-Risk Registrar" }
+          ] as any,
+          links: [
+            { source: extractedUrl, target: "Malicious IP 1" },
+            { source: extractedUrl, target: "Malicious IP 2" },
+            { source: extractedUrl, target: "Suspicious TLD" },
+            { source: "Malicious IP 1", target: "Malicious IP 2" }
+          ] as any
+        });
+      }
+
       setIsAnalyzing(false);
     }, 2000);
   };
 
   return (
     <div className="w-full h-full flex flex-col md:flex-row gap-6">
-      {/* Left Panel: Input & Disassembly */}
+      {/* Left Panel */}
       <div className="w-full md:w-1/2 flex flex-col gap-6">
         <div className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col">
           <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -124,11 +143,11 @@ export default function PhishingDisassembler() {
 
         {/* Dissected View */}
         <AnimatePresence>
-          {result && (
+          {result && !showGraph && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col"
+              className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col flex-grow"
             >
               <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest mb-4">Dissected Message</h3>
               <div 
@@ -144,6 +163,41 @@ export default function PhishingDisassembler() {
                   <span className="w-3 h-3 bg-blue-500/20 border border-blue-500/50 rounded inline-block" />
                   Extracted Link
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {result && showGraph && result.isPhishing && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-black/40 border border-[#00f3ff] rounded-xl p-6 flex flex-col flex-grow overflow-hidden"
+            >
+              <h3 className="font-mono text-sm text-[#00f3ff] uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Network className="w-4 h-4" /> Fraud Network Map
+              </h3>
+              <div className="flex-grow bg-[#0a0a0a] rounded-lg border border-[#222] overflow-hidden flex items-center justify-center relative h-64">
+                <ForceGraph2D
+                  graphData={graphData}
+                  nodeAutoColorBy="group"
+                  nodeCanvasObject={(node, ctx, globalScale) => {
+                    const label = (node as any).name;
+                    const fontSize = 12/globalScale;
+                    ctx.font = `${fontSize}px Sans-Serif`;
+                    ctx.fillStyle = (node as any).color;
+                    ctx.beginPath();
+                    ctx.arc(node.x!, node.y!, 4, 0, 2 * Math.PI, false);
+                    ctx.fill();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(label, node.x!, node.y! + 8);
+                  }}
+                  width={400}
+                  height={250}
+                  linkColor={() => '#333333'}
+                  backgroundColor="#0a0a0a"
+                />
               </div>
             </motion.div>
           )}
@@ -176,6 +230,24 @@ export default function PhishingDisassembler() {
                   </p>
                 </div>
               </div>
+
+              {result.isPhishing && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowGraph(!showGraph)}
+                    className="p-2 border border-[#00f3ff]/50 bg-[#00f3ff]/10 text-[#00f3ff] rounded hover:bg-[#00f3ff]/20 transition-colors"
+                    title="Toggle Network Graph"
+                  >
+                    <Network className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setShowReport(true)}
+                    className="bg-[#ff003c] hover:bg-[#ff003c]/80 text-black text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
+                  >
+                    <FileText className="w-4 h-4" /> REPORT
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* URL Intelligence Report */}
@@ -214,7 +286,7 @@ export default function PhishingDisassembler() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center flex-grow text-gray-500 font-mono text-sm text-center">
-                <LinkIcon className="w-12 h-12 mb-4 opacity-50" />
+                <LinkIcon className="w-12 h-12 mb-4 opacity-30" />
                 <p>No actionable URLs detected in payload.</p>
                 {result.isPhishing && (
                   <p className="text-[#ff003c] mt-4 max-w-xs">
@@ -231,6 +303,22 @@ export default function PhishingDisassembler() {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showReport && result && (
+          <ReportGenerator 
+            source="PhishingDisassembler"
+            threatLevel={result.score}
+            data={{
+              payload: inputText,
+              url: result.extractedUrl,
+              location: result.domainInfo?.location,
+              summary: "High-risk manipulation tactics detected combined with a newly registered malicious domain."
+            }}
+            onClose={() => setShowReport(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
