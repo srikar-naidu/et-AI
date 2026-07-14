@@ -6,6 +6,7 @@ import { ShieldAlert, ScanLine, Link as LinkIcon, Activity } from "lucide-react"
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
+import DeepfakeAnalyzer from "@/components/DeepfakeAnalyzer";
 import ChatbotWidget from "@/components/ChatbotWidget";
 
 export default function Home() {
@@ -92,6 +93,7 @@ export default function Home() {
               {activeModule === "voice-shield" && <VoiceShield />}
               {activeModule === "counterfeit-scanner" && <CounterfeitScanner />}
               {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
+              {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
             </div>
           </div>
         )}
