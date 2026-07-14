@@ -1,0 +1,236 @@
+"use client";
+
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, AlertTriangle, ShieldCheck, Link as LinkIcon, Globe, Clock, Server } from "lucide-react";
+
+// Mock analysis data based on typical phishing patterns
+const PSYCHOLOGICAL_TRIGGERS = [
+  "suspended", "disconnected", "blocked", "urgent", "immediately", "verify", 
+  "kyc", "pan", "aadhar", "electricity", "bill", "pending", "claim", "prize"
+];
+
+interface AnalysisResult {
+  isPhishing: boolean;
+  score: number;
+  extractedUrl: string | null;
+  domainInfo: {
+    age: string;
+    location: string;
+    registrar: string;
+  } | null;
+  highlightedText: string;
+}
+
+export default function PhishingDisassembler() {
+  const [inputText, setInputText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+
+  const analyzeText = () => {
+    if (!inputText.trim()) return;
+    
+    setIsAnalyzing(true);
+    setResult(null);
+
+    // Simulate network delay for API analysis
+    setTimeout(() => {
+      const lowerText = inputText.toLowerCase();
+      
+      // Extract URL using simple regex
+      const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+      const urls = inputText.match(urlRegex);
+      const extractedUrl = urls ? urls[0] : null;
+
+      // Calculate risk score based on triggers and URL presence
+      let score = 0;
+      let triggerCount = 0;
+      
+      PSYCHOLOGICAL_TRIGGERS.forEach(trigger => {
+        if (lowerText.includes(trigger)) triggerCount++;
+      });
+
+      if (triggerCount > 0) score += Math.min(triggerCount * 20, 50);
+      if (extractedUrl) {
+        score += 30;
+        // Check for common suspicious TLDs or URL shorteners (mock logic)
+        if (extractedUrl.includes(".xyz") || extractedUrl.includes(".tk") || extractedUrl.includes("bit.ly")) {
+          score += 20;
+        }
+      }
+
+      const isPhishing = score > 60;
+
+      // Highlight the triggers in the text
+      let highlighted = inputText;
+      PSYCHOLOGICAL_TRIGGERS.forEach(trigger => {
+        const regex = new RegExp(`\\b${trigger}\\b`, 'gi');
+        highlighted = highlighted.replace(regex, `<span class="bg-[#ff003c]/20 text-[#ff003c] border border-[#ff003c]/50 rounded px-1 font-bold">$&</span>`);
+      });
+      if (extractedUrl) {
+        const escapedUrl = extractedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const urlReg = new RegExp(escapedUrl, 'g');
+        highlighted = highlighted.replace(urlReg, `<span class="bg-blue-500/20 text-blue-400 border border-blue-500/50 rounded px-1 underline cursor-help">$&</span>`);
+      }
+
+      setResult({
+        isPhishing,
+        score,
+        extractedUrl,
+        domainInfo: extractedUrl ? {
+          age: isPhishing ? "2 Days Old" : "4 Years Old",
+          location: isPhishing ? "St. Petersburg, RU" : "Mumbai, IN",
+          registrar: isPhishing ? "Hidden/PrivacyGuard" : "GoDaddy / AWS",
+        } : null,
+        highlightedText: highlighted
+      });
+
+      setIsAnalyzing(false);
+    }, 2000);
+  };
+
+  return (
+    <div className="w-full h-full flex flex-col md:flex-row gap-6">
+      {/* Left Panel: Input & Disassembly */}
+      <div className="w-full md:w-1/2 flex flex-col gap-6">
+        <div className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col">
+          <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Search className="w-4 h-4" /> Message Payload Input
+          </h3>
+          
+          <textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Paste suspicious SMS, WhatsApp message, or email here..."
+            className="w-full h-32 bg-[#0a0a0a] border border-[#333333] rounded-lg p-4 text-gray-300 font-mono text-sm focus:outline-none focus:border-[#00f3ff] transition-colors resize-none mb-4"
+          />
+          
+          <button
+            onClick={analyzeText}
+            disabled={isAnalyzing || !inputText.trim()}
+            className="w-full bg-[#00f3ff]/10 hover:bg-[#00f3ff]/20 border border-[#00f3ff]/50 text-[#00f3ff] font-mono font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {isAnalyzing ? (
+              <span className="flex items-center gap-2">
+                <Search className="w-5 h-5 animate-spin" /> DISASSEMBLING...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Search className="w-5 h-5" /> ANALYZE PAYLOAD
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Dissected View */}
+        <AnimatePresence>
+          {result && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col"
+            >
+              <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest mb-4">Dissected Message</h3>
+              <div 
+                className="bg-[#0a0a0a] border border-[#222] rounded-lg p-4 font-sans text-lg text-gray-300 leading-relaxed whitespace-pre-wrap"
+                dangerouslySetInnerHTML={{ __html: result.highlightedText }}
+              />
+              <div className="mt-4 flex gap-4 text-xs font-mono text-gray-500">
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 bg-[#ff003c]/20 border border-[#ff003c]/50 rounded inline-block" />
+                  Psychological Trigger
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 bg-blue-500/20 border border-blue-500/50 rounded inline-block" />
+                  Extracted Link
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Right Panel: Risk Report */}
+      <div className="w-full md:w-1/2 flex flex-col gap-6">
+        {result ? (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`bg-black/40 border rounded-xl p-6 flex flex-col flex-grow ${
+              result.isPhishing ? "border-[#ff003c]/50" : "border-[#00ff66]/50"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-8 pb-6 border-b border-[#333333]">
+              <div className="flex items-center gap-4">
+                {result.isPhishing ? (
+                  <AlertTriangle className="w-12 h-12 text-[#ff003c]" />
+                ) : (
+                  <ShieldCheck className="w-12 h-12 text-[#00ff66]" />
+                )}
+                <div>
+                  <h2 className={`font-mono text-2xl font-bold ${result.isPhishing ? "text-[#ff003c]" : "text-[#00ff66]"}`}>
+                    {result.isPhishing ? "CRITICAL THREAT" : "SAFE MESSAGE"}
+                  </h2>
+                  <p className="text-gray-400 font-mono text-sm mt-1">
+                    Risk Score: <span className="text-white">{result.score}/100</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* URL Intelligence Report */}
+            {result.extractedUrl ? (
+              <div className="flex flex-col gap-6">
+                <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest flex items-center gap-2">
+                  <Globe className="w-4 h-4" /> Domain Intelligence
+                </h3>
+                
+                <div className="bg-[#0a0a0a] border border-[#222] p-4 rounded-lg font-mono text-sm text-blue-400 break-all mb-2">
+                  {result.extractedUrl}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#111] border border-[#333] p-4 rounded-lg flex flex-col gap-2">
+                    <span className="text-gray-500 font-mono text-xs flex items-center gap-1"><Clock className="w-3 h-3"/> DOMAIN AGE</span>
+                    <span className={`font-mono font-bold ${result.domainInfo?.age.includes("Days") ? "text-[#ff003c]" : "text-white"}`}>
+                      {result.domainInfo?.age}
+                    </span>
+                  </div>
+                  <div className="bg-[#111] border border-[#333] p-4 rounded-lg flex flex-col gap-2">
+                    <span className="text-gray-500 font-mono text-xs flex items-center gap-1"><Server className="w-3 h-3"/> LOCATION</span>
+                    <span className="font-mono font-bold text-white">
+                      {result.domainInfo?.location}
+                    </span>
+                  </div>
+                </div>
+
+                {result.isPhishing && (
+                  <div className="mt-auto bg-[#ff003c]/10 border border-[#ff003c] rounded-lg p-4">
+                    <p className="text-[#ff003c] font-mono text-sm">
+                      <strong>WARNING:</strong> This URL points to a newly registered domain often associated with credential harvesting. The message uses urgency to manipulate you into clicking. Do not interact with the link.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center flex-grow text-gray-500 font-mono text-sm text-center">
+                <LinkIcon className="w-12 h-12 mb-4 opacity-50" />
+                <p>No actionable URLs detected in payload.</p>
+                {result.isPhishing && (
+                  <p className="text-[#ff003c] mt-4 max-w-xs">
+                    However, psychological manipulation was detected. Proceed with caution.
+                  </p>
+                )}
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          <div className="bg-black/40 border border-[#333333] rounded-xl flex-grow flex flex-col items-center justify-center text-gray-500 font-mono text-sm p-6 text-center">
+            <Search className="w-12 h-12 mb-4 opacity-30" />
+            <p>Awaiting payload input for disassembly...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

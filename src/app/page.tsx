@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ShieldAlert, ScanLine, Link as LinkIcon, Activity } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
+import PhishingDisassembler from "@/components/PhishingDisassembler";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -89,12 +90,7 @@ export default function Home() {
             <div className="flex-grow bg-[#111111] border border-[#333333] rounded-lg p-6">
               {activeModule === "voice-shield" && <VoiceShield />}
               {activeModule === "counterfeit-scanner" && <CounterfeitScanner />}
-              {activeModule === "phishing-disassembler" && (
-                <div className="text-center text-gray-400 font-mono mt-10">
-                  <LinkIcon className="w-16 h-16 mx-auto mb-4 text-[#ff003c] animate-pulse" />
-                  <p>Initializing Phishing Disassembler module...</p>
-                </div>
-              )}
+              {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
             </div>
           </div>
         )}
