@@ -34,6 +34,13 @@ export default function Home() {
       icon: <LinkIcon className="w-8 h-8 text-[#ff003c]" />,
       color: "border-[#ff003c]",
     },
+    {
+      id: "deepfake-analyzer",
+      title: "Deepfake Analyzer",
+      description: "Deepfake audio detection & transcription analysis for voice scams.",
+      icon: <ShieldAlert className="w-8 h-8 text-purple-400" />,
+      color: "border-purple-400",
+    },
   ];
 
   return (
