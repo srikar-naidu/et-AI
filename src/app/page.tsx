@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ScanLine, Link as LinkIcon, Activity } from "lucide-react";
+import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
 import DeepfakeAnalyzer from "@/components/DeepfakeAnalyzer";
+import GeospatialMapper from "@/components/GeospatialMapper";
 import ChatbotWidget from "@/components/ChatbotWidget";
 
 export default function Home() {
@@ -40,6 +41,13 @@ export default function Home() {
       description: "Deepfake audio detection & transcription analysis for voice scams.",
       icon: <ShieldAlert className="w-8 h-8 text-purple-400" />,
       color: "border-purple-400",
+    },
+    {
+      id: "geospatial-mapper",
+      title: "Geospatial Mapper",
+      description: "Real-time crime hotspot mapping & patrol optimization.",
+      icon: <MapPin className="w-8 h-8 text-amber-400" />,
+      color: "border-amber-400",
     },
   ];
 
@@ -96,11 +104,12 @@ export default function Home() {
             </div>
             
             {/* Module Rendering Space */}
-            <div className="flex-grow bg-[#111111] border border-[#333333] rounded-lg p-6">
+            <div className="flex-grow bg-[#111111] border border-[#333333] rounded-xl p-6">
               {activeModule === "voice-shield" && <VoiceShield />}
               {activeModule === "counterfeit-scanner" && <CounterfeitScanner />}
               {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
               {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
+              {activeModule === "geospatial-mapper" && <GeospatialMapper />}
             </div>
           </div>
         )}
