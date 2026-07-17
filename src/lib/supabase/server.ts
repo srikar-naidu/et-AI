@@ -58,4 +58,16 @@ export async function insertRow<T extends Record<string, unknown>>(
   return records[0];
 }
 
+export async function supabaseStorage(path: string, options: RequestInit = {}) {
+  const config = getSupabaseConfig();
+  if (!config) throw new Error("Supabase is not configured. Add the Supabase environment variables locally.");
+  const response = await fetch(`${config.url}/storage/v1/${path}`, {
+    ...options,
+    headers: { apikey: config.secret, Authorization: `Bearer ${config.secret}`, ...options.headers },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Supabase storage request failed (${response.status}): ${await response.text()}`);
+  return response;
+}
+
 export type { SupabaseValue };

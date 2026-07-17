@@ -32,6 +32,22 @@ create table if not exists public.audit_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.evidence_items (
+  id uuid primary key default gen_random_uuid(),
+  case_id uuid not null references public.cases(id) on delete cascade,
+  original_filename text not null,
+  content_type text not null,
+  byte_size bigint not null check (byte_size > 0),
+  storage_path text not null unique,
+  sha256 text not null check (char_length(sha256) = 64),
+  source text not null,
+  created_at timestamptz not null default now()
+);
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('case-evidence', 'case-evidence', false, 20971520)
+on conflict (id) do nothing;
+
 create table if not exists public.graph_entities (
   id uuid primary key default gen_random_uuid(),
   external_id text not null unique,
@@ -57,12 +73,14 @@ create table if not exists public.graph_edges (
 create index if not exists complaints_created_at_idx on public.complaints (created_at desc);
 create index if not exists complaints_coordinates_idx on public.complaints (latitude, longitude);
 create index if not exists audit_events_case_id_idx on public.audit_events (case_id, created_at desc);
+create index if not exists evidence_items_case_id_idx on public.evidence_items (case_id, created_at desc);
 create index if not exists graph_edges_source_idx on public.graph_edges (source_external_id);
 create index if not exists graph_edges_target_idx on public.graph_edges (target_external_id);
 
 alter table public.cases enable row level security;
 alter table public.complaints enable row level security;
 alter table public.audit_events enable row level security;
+alter table public.evidence_items enable row level security;
 alter table public.graph_entities enable row level security;
 alter table public.graph_edges enable row level security;
 
