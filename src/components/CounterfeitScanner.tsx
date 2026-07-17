@@ -175,8 +175,8 @@ export default function CounterfeitScanner() {
               >
                 <CheckCircle2 className="w-20 h-20" />
                 <div>
-                  <h4 className="font-mono text-xl font-bold tracking-widest">VERIFIED</h4>
-                  <p className="text-xs text-gray-400 mt-2 font-mono">No counterfeit signal found in this image.<br/>{confidence !== null ? `Model confidence: ${(confidence * 100).toFixed(1)}%` : "Requires trained model service."}</p>
+                  <h4 className="font-mono text-xl font-bold tracking-widest">SCREENING RESULT: NO COUNTERFEIT SIGNAL OBSERVED</h4>
+                  <p className="text-xs text-gray-400 mt-2 font-mono">This is a non-conclusive screening output and should be reviewed by trained staff.<br/>{confidence !== null ? `Model confidence: ${(confidence * 100).toFixed(1)}%` : "Requires trained model service."}</p>
                 </div>
               </motion.div>
             ) : scanResult === "COUNTERFEIT" ? (
@@ -187,9 +187,9 @@ export default function CounterfeitScanner() {
               >
                 <XCircle className="w-20 h-20 animate-pulse" />
                 <div>
-                  <h4 className="font-mono text-xl font-bold tracking-widest">COUNTERFEIT DETECTED</h4>
+                  <h4 className="font-mono text-xl font-bold tracking-widest">SCREENING RESULT: COUNTERFEIT-LIKE PATTERN OBSERVED</h4>
                   <p className="text-xs text-gray-400 mt-2 font-mono text-left bg-black/50 p-2 rounded">
-                    Image patterns are consistent with the counterfeit class.<br/>
+                    This screening output is non-conclusive and should be confirmed by trained staff.<br/>
                     {confidence !== null ? `Model confidence: ${(confidence * 100).toFixed(1)}%` : "Requires trained model service."}<br/>
                     Preserve the note and seek trained examiner verification.
                   </p>

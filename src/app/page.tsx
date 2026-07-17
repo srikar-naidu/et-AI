@@ -13,6 +13,8 @@ import CitizenReport from "@/components/CitizenReport";
 import FraudNetwork from "@/components/FraudNetwork";
 import CaseConsole from "@/components/CaseConsole";
 import ReportingGuide from "@/components/ReportingGuide";
+import ServiceReadinessPanel from "@/components/ServiceReadinessPanel";
+import OperatorAuthPanel from "@/components/OperatorAuthPanel";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -89,7 +91,11 @@ export default function Home() {
       </header>
 
       {/* Main Content Area */}
-      <div className="w-full max-w-6xl flex-grow flex flex-col items-center justify-center">
+      <div className="w-full max-w-6xl grow flex flex-col items-center justify-center">
+        <div className="mb-8 w-full space-y-4">
+          <ServiceReadinessPanel />
+          <OperatorAuthPanel />
+        </div>
         {!activeModule ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
             {modules.map((mod, i) => (
@@ -102,7 +108,7 @@ export default function Home() {
                 className={`bg-[#111111] border ${mod.color} p-6 rounded-lg cursor-pointer hover:bg-[#1a1a1a] transition-all relative overflow-hidden group text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#00f3ff]`}
               >
                 {/* Neon Glow Effect on Hover */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
                 
                 <div className="mb-4 bg-black/50 w-16 h-16 rounded-full flex items-center justify-center border border-[#333333]">
                   {mod.icon}
@@ -124,7 +130,7 @@ export default function Home() {
             </div>
             
             {/* Module Rendering Space */}
-            <div className="flex-grow bg-[#111111] border border-[#333333] rounded-xl p-6">
+            <div className="grow bg-[#111111] border border-[#333333] rounded-xl p-6">
               {activeModule === "voice-shield" && <VoiceShield />}
               {activeModule === "counterfeit-scanner" && <CounterfeitScanner />}
               {activeModule === "phishing-disassembler" && <PhishingDisassembler />}

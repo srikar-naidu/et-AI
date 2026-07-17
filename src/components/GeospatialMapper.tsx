@@ -1,17 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  MapPin,
-  Target,
-  Truck,
-  Zap,
-  Shield,
-  Users,
-  AlertTriangle,
-  Activity,
-} from "lucide-react";
+import { Activity, AlertTriangle, MapPin, Shield, Target, Users, Zap } from "lucide-react";
+import LiveMap from "./LiveMap";
 
 interface Hotspot {
   id: string;
@@ -23,9 +15,9 @@ interface Hotspot {
   location: string;
 }
 
-const mockHotspots: Hotspot[] = [
+const sampleHotspots: Hotspot[] = [
   {
-    id: "1",
+    id: "sample-1",
     lat: 28.6139,
     lng: 77.209,
     type: "digital-arrest",
@@ -34,7 +26,7 @@ const mockHotspots: Hotspot[] = [
     location: "Connaught Place, Delhi",
   },
   {
-    id: "2",
+    id: "sample-2",
     lat: 19.076,
     lng: 72.8777,
     type: "phishing",
@@ -43,7 +35,7 @@ const mockHotspots: Hotspot[] = [
     location: "Bandra, Mumbai",
   },
   {
-    id: "3",
+    id: "sample-3",
     lat: 12.9716,
     lng: 77.5946,
     type: "counterfeit",
@@ -52,7 +44,7 @@ const mockHotspots: Hotspot[] = [
     location: "MG Road, Bengaluru",
   },
   {
-    id: "4",
+    id: "sample-4",
     lat: 22.5726,
     lng: 88.3639,
     type: "digital-arrest",
@@ -61,7 +53,7 @@ const mockHotspots: Hotspot[] = [
     location: "Park Street, Kolkata",
   },
   {
-    id: "5",
+    id: "sample-5",
     lat: 13.0827,
     lng: 80.2707,
     type: "phishing",
@@ -73,15 +65,18 @@ const mockHotspots: Hotspot[] = [
 
 export default function GeospatialMapper() {
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
-  const [hotspots, setHotspots] = useState<Hotspot[]>(mockHotspots);
+  const [hotspots, setHotspots] = useState<Hotspot[]>(sampleHotspots);
   const [isLiveData, setIsLiveData] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | Hotspot["type"]>("all");
 
   useEffect(() => {
     async function loadHotspots() {
       try {
         const response = await fetch("/api/hotspots", { cache: "no-store" });
         const payload = await response.json();
-        if (!response.ok || !payload.configured || payload.hotspots.length === 0) return;
+        if (!response.ok || !payload.configured || !Array.isArray(payload.hotspots) || payload.hotspots.length === 0) {
+          return;
+        }
 
         const liveHotspots = payload.hotspots.map((hotspot: {
           id: string;
@@ -99,10 +94,12 @@ export default function GeospatialMapper() {
           count: hotspot.reportCount,
           location: hotspot.locationLabel,
         })) as Hotspot[];
+
         setHotspots(liveHotspots);
+        setSelectedHotspot(liveHotspots[0] ?? null);
         setIsLiveData(true);
       } catch {
-        // The clearly labelled sample layer remains available when the database is offline.
+        setSelectedHotspot(sampleHotspots[0] ?? null);
       }
     }
 
@@ -137,204 +134,110 @@ export default function GeospatialMapper() {
     }
   };
 
+  const visibleHotspots = typeFilter === "all" ? hotspots : hotspots.filter((hotspot) => hotspot.type === typeFilter);
+
   return (
-    <div className="w-full h-full flex flex-col md:flex-row gap-6">
-      {/* Left Panel: Map View */}
-      <div className="w-full md:w-2/3 flex flex-col gap-4">
-        <div className="relative w-full flex-grow bg-[#0a0a0a] border border-[#333333] rounded-xl overflow-hidden flex items-center justify-center">
-          {/* Simulated India Map Background */}
-          <div className="absolute inset-0 opacity-20">
-            <svg viewBox="0 0 400 400" className="w-full h-full">
-              <path
-                d="M100,50 L150,80 L140,120 L160,150 L120,180 L100,220 L150,240 L170,280 L200,300 L220,280 L240,240 L220,200 L250,180 L280,150 L300,120 L280,80 L250,50 Z"
-                fill="#00f3ff"
-                stroke="#00f3ff"
-                strokeWidth="2"
-              />
-            </svg>
+    <div className="flex h-full w-full flex-col gap-6 md:flex-row">
+      <div className="flex w-full flex-col gap-4 md:w-2/3">
+        <div className="overflow-hidden rounded-xl border border-[#333333] bg-[#0a0a0a] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-mono text-xs uppercase tracking-widest text-gray-400">{isLiveData ? "Citizen incident signals" : "Sample incident layer"}</h3>
+              <p className="mt-1 text-[11px] font-mono text-gray-500">{isLiveData ? "Aggregated, non-sensitive incident signals from connected reports." : "Connect Supabase to activate live reports."}</p>
+            </div>
+            <div className="rounded-full border border-[#333] px-3 py-1 text-[11px] font-mono text-gray-400">Privacy-aware map view</div>
           </div>
-
-          {/* Hotspots */}
-          {hotspots.map((hotspot) => (
-            <motion.div
-              key={hotspot.id}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              whileHover={{ scale: 1.2 }}
-              onClick={() => setSelectedHotspot(hotspot)}
-              className={`absolute cursor-pointer ${
-                hotspot.severity === "critical"
-                  ? "text-[#ff003c]"
-                  : hotspot.severity === "high"
-                  ? "text-orange-400"
-                  : hotspot.severity === "medium"
-                  ? "text-yellow-400"
-                  : "text-[#00ff66]"
-              }`}
-              style={{
-                left: `${50 + (hotspot.lng - 77.5) * 4}%`,
-                top: `${50 + (23 - hotspot.lat) * 6}%`,
-              }}
-            >
-              <MapPin className="w-6 h-6 animate-pulse" />
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#ff003c] text-white text-xs px-1 rounded whitespace-nowrap">
-                {hotspot.count}
-              </span>
-            </motion.div>
-          ))}
-
-          {/* Map Overlay Grid */}
-          <div className="absolute inset-0 pointer-events-none opacity-30 bg-[linear-gradient(rgba(0,243,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,243,255,0.1)_1px,transparent_1px)] bg-[size:40px_40px]" />
-
-          {/* Map Title */}
-          <div className="absolute top-4 left-4 bg-black/70 p-3 rounded-lg border border-[#333333]">
-            <h3 className="font-mono text-xs text-gray-400 uppercase tracking-widest">
-              {isLiveData ? "Citizen incident signals" : "Sample incident layer"}
-            </h3>
-            <p className="mt-1 text-[10px] font-mono text-gray-500">{isLiveData ? "Reports with shared location" : "Connect Supabase to activate live reports"}</p>
+          <div className="h-110 w-full overflow-hidden rounded-lg border border-[#222]">
+            <LiveMap hotspots={visibleHotspots} selectedHotspot={selectedHotspot} onSelect={setSelectedHotspot} />
           </div>
         </div>
 
-        {/* Map Controls */}
-        <div className="bg-black/40 border border-[#333333] rounded-xl p-4 flex justify-between items-center">
-          <div className="flex gap-2">
-            <button className="px-3 py-1 bg-[#00f3ff]/20 border border-[#00f3ff] text-[#00f3ff] text-xs font-mono rounded hover:bg-[#00f3ff]/30">
-              +
-            </button>
-            <button className="px-3 py-1 bg-[#00f3ff]/20 border border-[#00f3ff] text-[#00f3ff] text-xs font-mono rounded hover:bg-[#00f3ff]/30">
-              -
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#333333] bg-black/40 p-4">
+          <div className="flex flex-wrap gap-2">
+            {(["all", "digital-arrest", "phishing", "counterfeit"] as const).map((type) => (
+              <button key={type} onClick={() => setTypeFilter(type)} className={`rounded border px-3 py-1.5 text-xs font-mono transition-colors ${typeFilter === type ? "border-[#00f3ff] bg-[#00f3ff]/20 text-[#00f3ff]" : "border-[#333] text-gray-400 hover:border-[#00f3ff]/50"}`}>
+                {type === "all" ? "ALL" : type.replace("-", " ").toUpperCase()}
+              </button>
+            ))}
           </div>
-          <div className="flex gap-3 text-xs font-mono text-gray-400">
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 bg-[#ff003c] rounded-full" />
-              Critical
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 bg-orange-400 rounded-full" />
-              High
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 bg-yellow-400 rounded-full" />
-              Medium
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-3 h-3 bg-[#00ff66] rounded-full" />
-              Low
-            </span>
+          <div className="flex flex-wrap gap-3 text-xs font-mono text-gray-400">
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-[#ff003c]" />Critical</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-orange-400" />High</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-yellow-400" />Medium</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full bg-[#00ff66]" />Low</span>
           </div>
         </div>
       </div>
 
-      {/* Right Panel: Hotspot Details & Controls */}
-      <div className="w-full md:w-1/3 flex flex-col gap-4">
-        {/* Selected Hotspot Details */}
-        <div className="bg-black/40 border border-[#333333] rounded-xl overflow-hidden flex flex-col flex-grow">
-          <div className="p-4 border-b border-[#333333] bg-[#111111] flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-gray-400" />
-            <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest">
-              Hotspot Details
-            </h3>
+      <div className="flex w-full flex-col gap-4 md:w-1/3">
+        <div className="flex grow flex-col overflow-hidden rounded-xl border border-[#333333] bg-black/40">
+          <div className="flex items-center gap-2 border-b border-[#333333] bg-[#111111] p-4">
+            <MapPin className="h-5 w-5 text-gray-400" />
+            <h3 className="font-mono text-sm uppercase tracking-widest text-gray-300">Hotspot Details</h3>
           </div>
 
-          <div className="p-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-4 p-4">
             {selectedHotspot ? (
               <>
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex flex-col gap-4"
-                >
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col gap-4">
                   <div className="flex items-center gap-3">
                     {getTypeIcon(selectedHotspot.type)}
                     <div>
-                      <h4 className="text-white font-bold font-mono">
-                        {selectedHotspot.location}
-                      </h4>
-                      <p className="text-gray-400 text-xs font-mono">
-                        {selectedHotspot.type}
-                      </p>
+                      <h4 className="font-mono font-bold text-white">{selectedHotspot.location}</h4>
+                      <p className="text-xs font-mono text-gray-400">{selectedHotspot.type}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div>
-                      <p className="text-gray-500 text-xs font-mono">Count</p>
-                      <p className="text-white font-bold font-mono text-xl">
-                        {selectedHotspot.count}
-                      </p>
+                      <p className="text-xs font-mono text-gray-500">Count</p>
+                      <p className="text-xl font-bold font-mono text-white">{selectedHotspot.count}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500 text-xs font-mono">Severity</p>
-                      <p className={`font-bold font-mono ${getSeverityColor(selectedHotspot.severity)}`}>
-                        {selectedHotspot.severity}
-                      </p>
+                      <p className="text-xs font-mono text-gray-500">Severity</p>
+                      <p className={`font-bold font-mono ${getSeverityColor(selectedHotspot.severity)}`}>{selectedHotspot.severity}</p>
                     </div>
                   </div>
                 </motion.div>
 
-                <div className="border border-[#333333] rounded-lg p-4">
-                  <h5 className="font-mono text-xs text-gray-400 uppercase tracking-widest mb-2">
-                    Recommendations
-                  </h5>
-                  <ul className="text-xs text-gray-300 space-y-2">
+                <div className="rounded-lg border border-[#333333] p-4">
+                  <h5 className="mb-2 font-mono text-xs uppercase tracking-widest text-gray-400">Recommendations</h5>
+                  <ul className="space-y-2 text-xs text-gray-300">
                     {selectedHotspot.severity === "critical" ? (
                       <>
-                        <li className="flex items-start gap-2">
-                          <Zap className="w-3 h-3 text-[#ff003c] mt-0.5" />
-                          <span>Deploy rapid response team</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Truck className="w-3 h-3 text-[#ff003c] mt-0.5" />
-                          <span>Alert nearby patrol units</span>
-                        </li>
+                        <li className="flex items-start gap-2"><Zap className="mt-0.5 h-3 w-3 text-[#ff003c]" /><span>Prioritise trained reviewer follow-up.</span></li>
+                        <li className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-3 w-3 text-[#ff003c]" /><span>Publish a local awareness alert after verification.</span></li>
                       </>
                     ) : (
                       <>
-                        <li className="flex items-start gap-2">
-                          <Users className="w-3 h-3 text-[#00ff66] mt-0.5" />
-                          <span>Monitor situation closely</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <MapPin className="w-3 h-3 text-[#00ff66] mt-0.5" />
-                          <span>
-                            Place patrols to area</span>
-                        </li>
+                        <li className="flex items-start gap-2"><Users className="mt-0.5 h-3 w-3 text-[#00ff66]" /><span>Monitor the area closely.</span></li>
+                        <li className="flex items-start gap-2"><MapPin className="mt-0.5 h-3 w-3 text-[#00ff66]" /><span>Add the area to the review queue.</span></li>
                       </>
                     )}
                   </ul>
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-                <MapPin className="w-12 h-12 opacity-30 mb-3" />
-                <p className="text-xs font-mono">
-                  Select a hotspot on the map
-                </p>
+              <div className="flex h-32 flex-col items-center justify-center text-gray-400">
+                <MapPin className="mb-3 h-12 w-12 opacity-30" />
+                <p className="text-xs font-mono">Select a hotspot on the map</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Statistics Overview */}
-        <div className="bg-black/40 border border-[#333333] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#333333] bg-[#111111] flex items-center gap-2">
-          <Activity className="w-5 h-5 text-gray-400" />
-            <h3 className="font-mono text-sm text-gray-300 uppercase tracking-widest">
-              Statistics
-            </h3>
+        <div className="overflow-hidden rounded-xl border border-[#333333] bg-black/40">
+          <div className="flex items-center gap-2 border-b border-[#333333] bg-[#111111] p-4">
+            <Activity className="h-5 w-5 text-gray-400" />
+            <h3 className="font-mono text-sm uppercase tracking-widest text-gray-300">Statistics</h3>
           </div>
-          <div className="p-4 grid grid-cols-2 gap-4">
-            <div className="bg-black/70 border border-[#333333] rounded-lg p-3">
-              <p className="text-gray-500 text-xs font-mono">Total Hotspots</p>
-              <p className="text-white font-bold font-mono text-lg">
-                {hotspots.length}
-              </p>
+          <div className="grid grid-cols-2 gap-4 p-4">
+            <div className="rounded-lg border border-[#333333] bg-black/70 p-3">
+              <p className="text-xs font-mono text-gray-500">Total hotpots</p>
+              <p className="text-lg font-bold font-mono text-white">{hotspots.length}</p>
             </div>
-            <div className="bg-black/70 border border-[#333333] rounded-lg p-3">
-              <p className="text-gray-500 text-xs font-mono">Critical</p>
-              <p className="text-[#ff003c] font-bold font-mono text-lg">
-                {hotspots.filter((h) => h.severity === "critical").length}
-              </p>
+            <div className="rounded-lg border border-[#333333] bg-black/70 p-3">
+              <p className="text-xs font-mono text-gray-500">Critical</p>
+              <p className="text-lg font-bold font-mono text-[#ff003c]">{hotspots.filter((h) => h.severity === "critical").length}</p>
             </div>
           </div>
         </div>

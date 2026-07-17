@@ -1,4 +1,5 @@
 import "server-only";
+import { isSupabaseClientConfigured as clientConfigured } from "./client";
 
 type SupabaseValue = Record<string, unknown> | Array<Record<string, unknown>>;
 
@@ -15,6 +16,10 @@ function getSupabaseConfig() {
 
 export function isSupabaseConfigured() {
   return Boolean(getSupabaseConfig());
+}
+
+export function isSupabaseClientConfigured() {
+  return clientConfigured();
 }
 
 export async function supabaseRest<T>(

@@ -300,7 +300,7 @@ export default function DeepfakeAnalyzer() {
 
             <div className="flex flex-col gap-6 flex-grow">
               <div className={`rounded-lg border p-4 ${result.authenticity === "spoofed" ? "border-[#ff003c]/60 bg-[#ff003c]/10" : result.authenticity === "real" ? "border-[#00ff66]/50 bg-[#00ff66]/5" : "border-[#333] bg-[#111]"}`}>
-                <p className="font-mono text-xs uppercase tracking-widest text-gray-400">Voice authenticity signal</p>
+                <p className="font-mono text-xs uppercase tracking-widest text-gray-400">Screening signal (non-conclusive)</p>
                 <p className="mt-2 font-mono text-lg font-bold text-white">{result.authenticity === "spoofed" ? "POSSIBLE SYNTHETIC / SPOOFED VOICE" : result.authenticity === "real" ? "NO SPOOF SIGNAL DETECTED" : "NOT AVAILABLE"}</p>
                 <p className="mt-2 text-xs leading-5 text-gray-300">{result.confidence !== null ? `Provider confidence: ${(result.confidence * 100).toFixed(1)}%. This is a screening signal, not conclusive proof.` : result.authenticityError ?? "Run the configured voice-authenticity service to generate this signal."}</p>
               </div>
