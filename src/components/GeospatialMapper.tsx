@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin,
@@ -73,6 +73,41 @@ const mockHotspots: Hotspot[] = [
 
 export default function GeospatialMapper() {
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
+  const [hotspots, setHotspots] = useState<Hotspot[]>(mockHotspots);
+  const [isLiveData, setIsLiveData] = useState(false);
+
+  useEffect(() => {
+    async function loadHotspots() {
+      try {
+        const response = await fetch("/api/hotspots", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.configured || payload.hotspots.length === 0) return;
+
+        const liveHotspots = payload.hotspots.map((hotspot: {
+          id: string;
+          latitude: number;
+          longitude: number;
+          incidentType: Hotspot["type"];
+          locationLabel: string;
+          reportCount: number;
+        }) => ({
+          id: hotspot.id,
+          lat: hotspot.latitude,
+          lng: hotspot.longitude,
+          type: hotspot.incidentType,
+          severity: hotspot.reportCount >= 5 ? "critical" : hotspot.reportCount >= 3 ? "high" : hotspot.reportCount >= 2 ? "medium" : "low",
+          count: hotspot.reportCount,
+          location: hotspot.locationLabel,
+        })) as Hotspot[];
+        setHotspots(liveHotspots);
+        setIsLiveData(true);
+      } catch {
+        // The clearly labelled sample layer remains available when the database is offline.
+      }
+    }
+
+    void loadHotspots();
+  }, []);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -120,7 +155,7 @@ export default function GeospatialMapper() {
           </div>
 
           {/* Hotspots */}
-          {mockHotspots.map((hotspot) => (
+          {hotspots.map((hotspot) => (
             <motion.div
               key={hotspot.id}
               initial={{ scale: 0, opacity: 0 }}
@@ -154,8 +189,9 @@ export default function GeospatialMapper() {
           {/* Map Title */}
           <div className="absolute top-4 left-4 bg-black/70 p-3 rounded-lg border border-[#333333]">
             <h3 className="font-mono text-xs text-gray-400 uppercase tracking-widest">
-              Geospatial Crime Mapping
+              {isLiveData ? "Citizen incident signals" : "Sample incident layer"}
             </h3>
+            <p className="mt-1 text-[10px] font-mono text-gray-500">{isLiveData ? "Reports with shared location" : "Connect Supabase to activate live reports"}</p>
           </div>
         </div>
 
@@ -291,13 +327,13 @@ export default function GeospatialMapper() {
             <div className="bg-black/70 border border-[#333333] rounded-lg p-3">
               <p className="text-gray-500 text-xs font-mono">Total Hotspots</p>
               <p className="text-white font-bold font-mono text-lg">
-                {mockHotspots.length}
+                {hotspots.length}
               </p>
             </div>
             <div className="bg-black/70 border border-[#333333] rounded-lg p-3">
               <p className="text-gray-500 text-xs font-mono">Critical</p>
               <p className="text-[#ff003c] font-bold font-mono text-lg">
-                {mockHotspots.filter((h) => h.severity === "critical").length}
+                {hotspots.filter((h) => h.severity === "critical").length}
               </p>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning } from "lucide-react";
+import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning, Network } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
@@ -10,6 +10,7 @@ import DeepfakeAnalyzer from "@/components/DeepfakeAnalyzer";
 import GeospatialMapper from "@/components/GeospatialMapper";
 import ChatbotWidget from "@/components/ChatbotWidget";
 import CitizenReport from "@/components/CitizenReport";
+import FraudNetwork from "@/components/FraudNetwork";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -56,6 +57,13 @@ export default function Home() {
       description: "Create a secure case record and add anonymised incident signals to the map.",
       icon: <FileWarning className="w-8 h-8 text-[#00f3ff]" />,
       color: "border-[#00f3ff]",
+    },
+    {
+      id: "fraud-network",
+      title: "Fraud Network Intelligence",
+      description: "Explore linked accounts, transfers, and flagged AML patterns with explainable risk signals.",
+      icon: <Network className="w-8 h-8 text-[#ff003c]" />,
+      color: "border-[#ff003c]",
     },
   ];
 
@@ -119,6 +127,7 @@ export default function Home() {
               {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
               {activeModule === "geospatial-mapper" && <GeospatialMapper />}
               {activeModule === "citizen-report" && <CitizenReport />}
+              {activeModule === "fraud-network" && <FraudNetwork />}
             </div>
           </div>
         )}
