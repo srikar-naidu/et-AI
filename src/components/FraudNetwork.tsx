@@ -6,10 +6,10 @@ import { AlertTriangle, Network, RefreshCw, ShieldCheck } from "lucide-react";
 
 type GraphNode = { id: string; label: string; type: string; riskScore: number; x?: number; y?: number };
 type GraphLink = { source: string; target: string; type: string; amount: number | null; flagged: boolean };
-type GraphPayload = { configured: boolean; nodes: GraphNode[]; links: GraphLink[]; error?: string };
+type GraphPayload = { configured: boolean; nodes: GraphNode[]; links: GraphLink[]; clusters?: Array<{ memberCount: number; maxRisk: number; flagged: boolean }>; error?: string };
 
 export default function FraudNetwork() {
-  const [graph, setGraph] = useState<GraphPayload>({ configured: false, nodes: [], links: [] });
+  const [graph, setGraph] = useState<GraphPayload>({ configured: false, nodes: [], links: [], clusters: [] });
   const [status, setStatus] = useState("Loading investigation graph…");
 
   async function loadGraph() {
@@ -60,6 +60,7 @@ export default function FraudNetwork() {
           <dl className="mt-5 space-y-5">
             <div><dt className="text-xs uppercase tracking-wide text-gray-500">Entities</dt><dd className="mt-1 text-2xl font-bold text-white">{graph.nodes.length}</dd></div>
             <div><dt className="text-xs uppercase tracking-wide text-gray-500">Transfers</dt><dd className="mt-1 text-2xl font-bold text-white">{graph.links.length}</dd></div>
+            <div><dt className="text-xs uppercase tracking-wide text-gray-500">Linked clusters</dt><dd className="mt-1 text-2xl font-bold text-white">{graph.clusters?.length ?? 0}</dd></div>
             <div><dt className="flex items-center gap-2 text-xs uppercase tracking-wide text-red-300"><AlertTriangle className="size-3" /> Flagged links</dt><dd className="mt-1 text-2xl font-bold text-[#ff003c]">{flaggedLinks}</dd></div>
           </dl>
           <div className="mt-8 rounded-lg bg-[#00ff66]/[.07] p-3 text-xs leading-5 text-gray-300"><ShieldCheck className="mb-2 size-4 text-[#00ff66]" />Use this view to prioritise review; retain source evidence before creating a case.</div>

@@ -28,6 +28,28 @@ export async function GET() {
       supabaseRest<EdgeRow[]>("graph_edges?select=source_external_id,target_external_id,relationship_type,amount,is_flagged,occurred_at&order=occurred_at.desc&limit=600"),
     ]);
 
+    const nodeRisk = new Map(entities.map((entity) => [entity.external_id, Number(entity.risk_score)]));
+    const neighbours = new Map<string, Set<string>>();
+    for (const edge of edges) {
+      neighbours.set(edge.source_external_id, (neighbours.get(edge.source_external_id) ?? new Set()).add(edge.target_external_id));
+      neighbours.set(edge.target_external_id, (neighbours.get(edge.target_external_id) ?? new Set()).add(edge.source_external_id));
+    }
+    const visited = new Set<string>();
+    const clusters = [...neighbours.keys()].flatMap((start) => {
+      if (visited.has(start)) return [];
+      const queue = [start];
+      const members: string[] = [];
+      visited.add(start);
+      while (queue.length) {
+        const current = queue.shift();
+        if (!current) continue;
+        members.push(current);
+        for (const neighbour of neighbours.get(current) ?? []) if (!visited.has(neighbour)) { visited.add(neighbour); queue.push(neighbour); }
+      }
+      const maxRisk = Math.max(...members.map((member) => nodeRisk.get(member) ?? 0));
+      return members.length > 1 ? [{ memberCount: members.length, maxRisk, flagged: members.some((member) => edges.some((edge) => edge.is_flagged && (edge.source_external_id === member || edge.target_external_id === member))) }] : [];
+    }).sort((left, right) => right.maxRisk - left.maxRisk);
+
     return NextResponse.json({
       configured: true,
       nodes: entities.map((entity) => ({
@@ -44,6 +66,7 @@ export async function GET() {
         flagged: edge.is_flagged,
         occurredAt: edge.occurred_at,
       })),
+      clusters,
     });
   } catch (error) {
     console.error("Graph request error:", error);

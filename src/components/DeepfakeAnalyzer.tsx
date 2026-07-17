@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, AudioLines, FileAudio, AlertTriangle, ShieldCheck, BrainCircuit } from "lucide-react";
+import { Upload, AudioLines, FileAudio, AlertTriangle, ShieldCheck, BrainCircuit, Mic, Square } from "lucide-react";
 
 interface AnalysisResult {
   transcript: string;
@@ -16,6 +16,7 @@ export default function DeepfakeAnalyzer() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -23,6 +24,8 @@ export default function DeepfakeAnalyzer() {
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number>(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   // Cleanup Web Audio API on unmount
   useEffect(() => {
@@ -31,6 +34,7 @@ export default function DeepfakeAnalyzer() {
       if (audioContextRef.current?.state !== "closed") {
         audioContextRef.current?.close();
       }
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
@@ -45,6 +49,32 @@ export default function DeepfakeAnalyzer() {
         const ctx = canvas.getContext("2d");
         ctx?.clearRect(0, 0, canvas.width, canvas.height);
       }
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.onstop = () => {
+        const recording = new File([new Blob(chunks, { type: recorder.mimeType || "audio/webm" })], `voice-sample-${Date.now()}.webm`, { type: recorder.mimeType || "audio/webm" });
+        setSelectedFile(recording);
+        setResult(null);
+        setIsRecording(false);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+      recordingStreamRef.current = stream;
+      recorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch {
+      setResult({ transcript: "Microphone access was not granted.", verdict: "Recordings stay in your browser until you run analysis.", authenticity: "unknown", confidence: null });
     }
   };
 
@@ -212,6 +242,10 @@ export default function DeepfakeAnalyzer() {
               </div>
             )}
           </div>
+
+          <button type="button" onClick={toggleRecording} className={`mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border font-mono text-sm font-bold transition-colors ${isRecording ? "border-[#ff003c] bg-[#ff003c]/10 text-[#ff003c]" : "border-[#00f3ff]/50 text-[#00f3ff] hover:bg-[#00f3ff]/10"}`}>
+            {isRecording ? <><Square className="size-4" /> STOP RECORDING</> : <><Mic className="size-4" /> RECORD AUDIO SAMPLE</>}
+          </button>
 
           <div className="mt-6 bg-[#0a0a0a] border border-[#222] rounded-lg p-4 h-32 relative overflow-hidden flex items-center justify-center">
             {/* Visualizer Canvas */}

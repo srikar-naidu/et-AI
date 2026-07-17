@@ -14,6 +14,24 @@ export default function CounterfeitScanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const captureCameraFrame = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) {
+      setScreeningError("Camera preview is not ready. Upload an image instead.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      setSelectedImage(new File([blob], `currency-capture-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      setScanResult("IDLE");
+      setScreeningError(null);
+    }, "image/jpeg", 0.92);
+  };
+
   useEffect(() => {
     // Request camera access
     const startCamera = async () => {
@@ -115,11 +133,12 @@ export default function CounterfeitScanner() {
           </AnimatePresence>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
           <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#00f3ff]/50 bg-[#00f3ff]/10 px-4 font-mono text-sm text-[#00f3ff] transition-colors hover:bg-[#00f3ff]/20">
             <Upload className="w-4 h-4" /> {selectedImage ? selectedImage.name : "UPLOAD NOTE IMAGE"}
             <input type="file" accept="image/*" className="sr-only" onChange={(event) => { setSelectedImage(event.target.files?.[0] ?? null); setScanResult("IDLE"); setScreeningError(null); }} />
           </label>
+          <button type="button" onClick={captureCameraFrame} disabled={!hasPermission} className="min-h-12 rounded-lg border border-[#00f3ff]/50 px-4 font-mono text-sm text-[#00f3ff] hover:bg-[#00f3ff]/10 disabled:cursor-not-allowed disabled:opacity-50"><Camera className="mr-2 inline size-4" />CAPTURE</button>
           <button
             onClick={handleScan}
             disabled={!selectedImage || isScanning}
