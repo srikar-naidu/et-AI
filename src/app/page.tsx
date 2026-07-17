@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning, Network } from "lucide-react";
+import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning, Network, FolderSearch } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
@@ -11,6 +11,7 @@ import GeospatialMapper from "@/components/GeospatialMapper";
 import ChatbotWidget from "@/components/ChatbotWidget";
 import CitizenReport from "@/components/CitizenReport";
 import FraudNetwork from "@/components/FraudNetwork";
+import CaseConsole from "@/components/CaseConsole";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export default function Home() {
       icon: <Network className="w-8 h-8 text-[#ff003c]" />,
       color: "border-[#ff003c]",
     },
+    { id: "case-console", title: "Case & Evidence Console", description: "Review case timelines, preserve evidence hashes, and export investigation bundles.", icon: <FolderSearch className="w-8 h-8 text-[#00ff66]" />, color: "border-[#00ff66]" },
   ];
 
   return (
@@ -128,6 +130,7 @@ export default function Home() {
               {activeModule === "geospatial-mapper" && <GeospatialMapper />}
               {activeModule === "citizen-report" && <CitizenReport />}
               {activeModule === "fraud-network" && <FraudNetwork />}
+              {activeModule === "case-console" && <CaseConsole />}
             </div>
           </div>
         )}
