@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Scan, ScanLine, Camera, XCircle, CheckCircle2, Maximize } from "lucide-react";
+import { Scan, ScanLine, Camera, XCircle, CheckCircle2, Maximize, Upload } from "lucide-react";
 
 export default function CounterfeitScanner() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<"IDLE" | "VERIFIED" | "COUNTERFEIT">("IDLE");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [screeningError, setScreeningError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -36,16 +39,26 @@ export default function CounterfeitScanner() {
     };
   }, []);
 
-  const handleScan = (type: "real" | "fake") => {
-    if (isScanning) return;
+  const handleScan = async () => {
+    if (isScanning || !selectedImage) return;
     setIsScanning(true);
     setScanResult("IDLE");
+    setScreeningError(null);
+    setConfidence(null);
 
-    // Simulate scanning process
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("image", selectedImage);
+      const response = await fetch("/api/counterfeit", { method: "POST", body: formData });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Screening could not be completed.");
+      setScanResult(payload.result === "counterfeit" ? "COUNTERFEIT" : "VERIFIED");
+      setConfidence(typeof payload.confidence === "number" ? payload.confidence : null);
+    } catch (error) {
+      setScreeningError(error instanceof Error ? error.message : "Screening could not be completed.");
+    } finally {
       setIsScanning(false);
-      setScanResult(type === "real" ? "VERIFIED" : "COUNTERFEIT");
-    }, 2500);
+    }
   };
 
   return (
@@ -102,21 +115,17 @@ export default function CounterfeitScanner() {
           </AnimatePresence>
         </div>
 
-        {/* Action Buttons for Demo */}
-        <div className="flex gap-4">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#00f3ff]/50 bg-[#00f3ff]/10 px-4 font-mono text-sm text-[#00f3ff] transition-colors hover:bg-[#00f3ff]/20">
+            <Upload className="w-4 h-4" /> {selectedImage ? selectedImage.name : "UPLOAD NOTE IMAGE"}
+            <input type="file" accept="image/*" className="sr-only" onChange={(event) => { setSelectedImage(event.target.files?.[0] ?? null); setScanResult("IDLE"); setScreeningError(null); }} />
+          </label>
           <button
-            onClick={() => handleScan("real")}
-            disabled={!hasPermission || isScanning}
-            className="flex-1 bg-[#00ff66]/10 hover:bg-[#00ff66]/20 border border-[#00ff66]/50 text-[#00ff66] font-mono py-3 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+            onClick={handleScan}
+            disabled={!selectedImage || isScanning}
+            className="min-h-12 bg-[#00ff66]/10 hover:bg-[#00ff66]/20 border border-[#00ff66]/50 text-[#00ff66] font-mono px-5 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <ScanLine className="w-5 h-5" /> SIMULATE REAL NOTE
-          </button>
-          <button
-            onClick={() => handleScan("fake")}
-            disabled={!hasPermission || isScanning}
-            className="flex-1 bg-[#ff003c]/10 hover:bg-[#ff003c]/20 border border-[#ff003c]/50 text-[#ff003c] font-mono py-3 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-          >
-            <ScanLine className="w-5 h-5" /> SIMULATE FAKE NOTE
+            <ScanLine className="w-5 h-5" /> SCREEN IMAGE
           </button>
         </div>
       </div>
@@ -148,7 +157,7 @@ export default function CounterfeitScanner() {
                 <CheckCircle2 className="w-20 h-20" />
                 <div>
                   <h4 className="font-mono text-xl font-bold tracking-widest">VERIFIED</h4>
-                  <p className="text-xs text-gray-400 mt-2 font-mono">Microprint: MATCH<br/>UV Signature: MATCH</p>
+                  <p className="text-xs text-gray-400 mt-2 font-mono">No counterfeit signal found in this image.<br/>{confidence !== null ? `Model confidence: ${(confidence * 100).toFixed(1)}%` : "Requires trained model service."}</p>
                 </div>
               </motion.div>
             ) : scanResult === "COUNTERFEIT" ? (
@@ -161,16 +170,16 @@ export default function CounterfeitScanner() {
                 <div>
                   <h4 className="font-mono text-xl font-bold tracking-widest">COUNTERFEIT DETECTED</h4>
                   <p className="text-xs text-gray-400 mt-2 font-mono text-left bg-black/50 p-2 rounded">
-                    &times; Intaglio print missing<br/>
-                    &times; Invalid security thread<br/>
-                    &times; Watermark opacity mismatch
+                    Image patterns are consistent with the counterfeit class.<br/>
+                    {confidence !== null ? `Model confidence: ${(confidence * 100).toFixed(1)}%` : "Requires trained model service."}<br/>
+                    Preserve the note and seek trained examiner verification.
                   </p>
                 </div>
               </motion.div>
             ) : (
-              <div className="text-gray-500 font-mono text-sm">
-                <Scan className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                <p>Awaiting item in viewfinder...</p>
+            <div className="text-gray-500 font-mono text-sm">
+              <Scan className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p>{screeningError ?? "Upload a note image to run model screening."}</p>
               </div>
             )}
           </div>

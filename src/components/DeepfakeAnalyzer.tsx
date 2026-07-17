@@ -7,6 +7,9 @@ import { Upload, AudioLines, FileAudio, AlertTriangle, ShieldCheck, BrainCircuit
 interface AnalysisResult {
   transcript: string;
   verdict: string;
+  authenticity: "spoofed" | "real" | "unknown";
+  confidence: number | null;
+  authenticityError?: string;
 }
 
 export default function DeepfakeAnalyzer() {
@@ -131,6 +134,12 @@ export default function DeepfakeAnalyzer() {
       if (!transcribeRes.ok) throw new Error(transcribeData.error);
       const transcript = transcribeData.text;
 
+      const authenticityForm = new FormData();
+      authenticityForm.append("file", selectedFile);
+      const authenticityPromise = fetch("/api/deepfake", { method: "POST", body: authenticityForm })
+        .then(async (response) => ({ ok: response.ok, payload: await response.json() }))
+        .catch(() => ({ ok: false, payload: { error: "Voice-authenticity screening could not be reached." } }));
+
       // 3. Analyze Transcript for Social Engineering/Deepfake context via Groq LLM
       const analyzeRes = await fetch("/api/chat", {
         method: "POST",
@@ -147,17 +156,24 @@ export default function DeepfakeAnalyzer() {
 
       const analyzeData = await analyzeRes.json();
       if (!analyzeRes.ok) throw new Error(analyzeData.error);
+      const authenticity = await authenticityPromise;
 
       setResult({
         transcript,
-        verdict: analyzeData.reply
+        verdict: analyzeData.reply,
+        authenticity: authenticity.ok && (authenticity.payload.result === "spoofed" || authenticity.payload.result === "real") ? authenticity.payload.result : "unknown",
+        confidence: authenticity.ok && typeof authenticity.payload.confidence === "number" ? authenticity.payload.confidence : null,
+        authenticityError: authenticity.ok ? undefined : authenticity.payload.error,
       });
 
     } catch (err: any) {
       console.error(err);
+      const message = err instanceof Error ? err.message : "Analysis failed.";
       setResult({
         transcript: "Error transcribing audio.",
-        verdict: "Error: " + err.message
+        verdict: "Error: " + message,
+        authenticity: "unknown",
+        confidence: null,
       });
     } finally {
       setIsAnalyzing(false);
@@ -242,13 +258,18 @@ export default function DeepfakeAnalyzer() {
               <div className="flex items-center gap-4">
                 <BrainCircuit className="w-10 h-10 text-[#00f3ff]" />
                 <div>
-                  <h2 className="font-mono text-xl font-bold text-[#00f3ff] uppercase">Deepfake Verdict</h2>
-                  <p className="text-gray-400 font-mono text-xs mt-1 tracking-wider">Llama 3 Contextual Analysis</p>
+                  <h2 className="font-mono text-xl font-bold text-[#00f3ff] uppercase">Audio integrity review</h2>
+                  <p className="text-gray-400 font-mono text-xs mt-1 tracking-wider">Voice authenticity + scam-context screening</p>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-6 flex-grow">
+              <div className={`rounded-lg border p-4 ${result.authenticity === "spoofed" ? "border-[#ff003c]/60 bg-[#ff003c]/10" : result.authenticity === "real" ? "border-[#00ff66]/50 bg-[#00ff66]/5" : "border-[#333] bg-[#111]"}`}>
+                <p className="font-mono text-xs uppercase tracking-widest text-gray-400">Voice authenticity signal</p>
+                <p className="mt-2 font-mono text-lg font-bold text-white">{result.authenticity === "spoofed" ? "POSSIBLE SYNTHETIC / SPOOFED VOICE" : result.authenticity === "real" ? "NO SPOOF SIGNAL DETECTED" : "NOT AVAILABLE"}</p>
+                <p className="mt-2 text-xs leading-5 text-gray-300">{result.confidence !== null ? `Provider confidence: ${(result.confidence * 100).toFixed(1)}%. This is a screening signal, not conclusive proof.` : result.authenticityError ?? "Run the configured voice-authenticity service to generate this signal."}</p>
+              </div>
               <div>
                 <h3 className="font-mono text-xs text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <FileAudio className="w-3 h-3" /> Groq Whisper Transcript

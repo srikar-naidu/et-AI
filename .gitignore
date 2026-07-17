@@ -42,3 +42,4 @@ next-env.d.ts
 
 # Local datasets and generated evidence are intentionally never committed.
 /data/
+/ml-service/models/
