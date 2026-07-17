@@ -1,0 +1,14 @@
+"use client";
+
+import { CheckCircle2, ExternalLink, PhoneCall, ShieldAlert } from "lucide-react";
+
+const checklist = [
+  "Disconnect from the suspicious call or chat. Do not transfer money or share OTPs, PINs, passwords, or screen access.",
+  "Save screenshots, call logs, URLs, transaction receipts, account details, and the time of the incident.",
+  "If money was transferred or is at immediate risk, call 1930 as soon as possible.",
+  "Use the official National Cyber Crime Reporting Portal to register and track the complaint.",
+];
+
+export default function ReportingGuide() {
+  return <section className="mx-auto w-full max-w-5xl"><div className="rounded-xl border border-[#ff003c]/50 bg-[#ff003c]/10 p-5 sm:p-6"><div className="flex items-start gap-4"><ShieldAlert className="mt-0.5 size-7 shrink-0 text-[#ff003c]" /><div><h2 className="text-xl font-bold text-white">If money is at immediate risk, act now</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-gray-200">This application helps organise evidence. It does not file an official complaint or replace emergency services.</p><div className="mt-5 flex flex-wrap gap-3"><a href="tel:1930" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#ff003c] px-4 font-mono text-sm font-bold text-black hover:bg-red-400"><PhoneCall className="size-4" /> Call 1930</a><a href="tel:112" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/35 px-4 font-mono text-sm font-bold text-white hover:bg-white/10"><PhoneCall className="size-4" /> Emergency 112</a></div></div></div></div><div className="mt-6 grid gap-6 lg:grid-cols-[1fr_.8fr]"><div className="rounded-xl border border-[#333] bg-black/30 p-5 sm:p-6"><h3 className="font-mono text-sm font-bold text-[#00f3ff]">Report-preparation checklist</h3><ol className="mt-5 space-y-4">{checklist.map((item, index) => <li key={item} className="flex gap-3 text-sm leading-6 text-gray-300"><span className="font-mono text-[#00f3ff]">0{index + 1}</span><span>{item}</span></li>)}</ol></div><aside className="rounded-xl border border-[#333] bg-black/30 p-5 sm:p-6"><CheckCircle2 className="size-6 text-[#00ff66]" /><h3 className="mt-3 text-lg font-bold text-white">Official reporting</h3><p className="mt-2 text-sm leading-6 text-gray-300">The National Cyber Crime Reporting Portal provides online reporting and tracking. Use its Report Suspect option for suspicious URLs, phone numbers, messaging handles, email IDs, and social-media identifiers.</p><a href="https://www.cybercrime.gov.in/" target="_blank" rel="noreferrer" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#00f3ff]/50 px-4 text-sm font-semibold text-[#00f3ff] hover:bg-[#00f3ff]/10"><ExternalLink className="size-4" /> Open official portal</a></aside></div></section>;
+}

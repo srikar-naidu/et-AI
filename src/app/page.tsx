@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning, Network, FolderSearch } from "lucide-react";
+import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning, Network, FolderSearch, Siren } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
@@ -12,6 +12,7 @@ import ChatbotWidget from "@/components/ChatbotWidget";
 import CitizenReport from "@/components/CitizenReport";
 import FraudNetwork from "@/components/FraudNetwork";
 import CaseConsole from "@/components/CaseConsole";
+import ReportingGuide from "@/components/ReportingGuide";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export default function Home() {
       color: "border-[#ff003c]",
     },
     { id: "case-console", title: "Case & Evidence Console", description: "Review case timelines, preserve evidence hashes, and export investigation bundles.", icon: <FolderSearch className="w-8 h-8 text-[#00ff66]" />, color: "border-[#00ff66]" },
+    { id: "reporting-guide", title: "Official Reporting Guide", description: "Prepare evidence, call the right helpline, and continue to official cybercrime reporting.", icon: <Siren className="w-8 h-8 text-[#ff003c]" />, color: "border-[#ff003c]" },
   ];
 
   return (
@@ -131,6 +133,7 @@ export default function Home() {
               {activeModule === "citizen-report" && <CitizenReport />}
               {activeModule === "fraud-network" && <FraudNetwork />}
               {activeModule === "case-console" && <CaseConsole />}
+              {activeModule === "reporting-guide" && <ReportingGuide />}
             </div>
           </div>
         )}
