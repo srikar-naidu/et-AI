@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin } from "lucide-react";
+import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
 import DeepfakeAnalyzer from "@/components/DeepfakeAnalyzer";
 import GeospatialMapper from "@/components/GeospatialMapper";
 import ChatbotWidget from "@/components/ChatbotWidget";
+import CitizenReport from "@/components/CitizenReport";
 
 export default function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -49,6 +50,13 @@ export default function Home() {
       icon: <MapPin className="w-8 h-8 text-amber-400" />,
       color: "border-amber-400",
     },
+    {
+      id: "citizen-report",
+      title: "Citizen Incident Report",
+      description: "Create a secure case record and add anonymised incident signals to the map.",
+      icon: <FileWarning className="w-8 h-8 text-[#00f3ff]" />,
+      color: "border-[#00f3ff]",
+    },
   ];
 
   return (
@@ -71,15 +79,15 @@ export default function Home() {
       {/* Main Content Area */}
       <div className="w-full max-w-6xl flex-grow flex flex-col items-center justify-center">
         {!activeModule ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
             {modules.map((mod, i) => (
-              <motion.div
+              <motion.button
                 key={mod.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
                 onClick={() => setActiveModule(mod.id)}
-                className={`bg-[#111111] border ${mod.color} p-6 rounded-lg cursor-pointer hover:bg-[#1a1a1a] transition-all relative overflow-hidden group`}
+                className={`bg-[#111111] border ${mod.color} p-6 rounded-lg cursor-pointer hover:bg-[#1a1a1a] transition-all relative overflow-hidden group text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#00f3ff]`}
               >
                 {/* Neon Glow Effect on Hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
@@ -89,7 +97,7 @@ export default function Home() {
                 </div>
                 <h2 className="text-xl font-bold font-mono text-white mb-2">{mod.title}</h2>
                 <p className="text-sm text-gray-400">{mod.description}</p>
-              </motion.div>
+              </motion.button>
             ))}
           </div>
         ) : (
@@ -110,6 +118,7 @@ export default function Home() {
               {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
               {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
               {activeModule === "geospatial-mapper" && <GeospatialMapper />}
+              {activeModule === "citizen-report" && <CitizenReport />}
             </div>
           </div>
         )}
