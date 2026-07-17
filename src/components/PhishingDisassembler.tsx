@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, AlertTriangle, ShieldCheck, Link as LinkIcon, Globe, Clock, Server, FileText, Network } from "lucide-react";
 import ReportGenerator from "./ReportGenerator";
-import ForceGraph2D from "react-force-graph-2d";
+
+const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
 const PSYCHOLOGICAL_TRIGGERS = [
   "suspended", "disconnected", "blocked", "urgent", "immediately", "verify", 
@@ -181,17 +183,18 @@ export default function PhishingDisassembler() {
                   graphData={graphData}
                   nodeAutoColorBy="group"
                   nodeCanvasObject={(node, ctx, globalScale) => {
-                    const label = (node as any).name;
+                    const nodeWithCoords = node as any;
+                    const label = nodeWithCoords.name;
                     const fontSize = 12/globalScale;
                     ctx.font = `${fontSize}px Sans-Serif`;
-                    ctx.fillStyle = (node as any).color;
+                    ctx.fillStyle = nodeWithCoords.color;
                     ctx.beginPath();
-                    ctx.arc(node.x!, node.y!, 4, 0, 2 * Math.PI, false);
+                    ctx.arc(nodeWithCoords.x, nodeWithCoords.y, 4, 0, 2 * Math.PI, false);
                     ctx.fill();
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = 'white';
-                    ctx.fillText(label, node.x!, node.y! + 8);
+                    ctx.fillText(label, nodeWithCoords.x, nodeWithCoords.y + 8);
                   }}
                   width={400}
                   height={250}

@@ -55,10 +55,8 @@ export default function VoiceShield() {
         });
         if (res.ok) {
           const data: AnalysisResult = await res.json();
-          if (!data.error) {
-            setAnalysis(data);
-            setThreatLevel(data.threat_level);
-          }
+          setAnalysis(data);
+          setThreatLevel(data.threat_level);
         }
       } catch (err) {
         console.error("Analysis fetch error:", err);

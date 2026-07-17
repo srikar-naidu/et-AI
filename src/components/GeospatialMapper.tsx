@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Activity, AlertTriangle, MapPin, Shield, Target, Users, Zap } from "lucide-react";
-import LiveMap from "./LiveMap";
+import dynamic from "next/dynamic";
+
+const LiveMap = dynamic(() => import("./LiveMap"), { ssr: false });
 
 interface Hotspot {
   id: string;

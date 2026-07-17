@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ForceGraph2D from "react-force-graph-2d";
+import dynamic from "next/dynamic";
 import { AlertTriangle, Network, RefreshCw, ShieldCheck } from "lucide-react";
+
+const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
 type GraphNode = { id: string; label: string; type: string; riskScore: number; x?: number; y?: number };
 type GraphLink = { source: string; target: string; type: string; amount: number | null; flagged: boolean };
