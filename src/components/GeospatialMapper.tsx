@@ -16,7 +16,6 @@ import {
   Send,
   Shield,
   Target,
-  Upload,
   Users,
   Zap,
 } from "lucide-react";
@@ -100,7 +99,7 @@ const sampleHotspots: Hotspot[] = [
   },
 ];
 
-type TimeRange = "all" | "hour" | "day" | "week";
+type TimeRange = "all";
 type DeploymentState = Record<string, { units: number; status: "monitoring" | "dispatching" | "escalated" }>;
 
 function deriveDistrict(location: string) {
@@ -129,87 +128,21 @@ function getDefaultDeployment(hotspot: Hotspot) {
   return { units, status } as const;
 }
 
-function parseCsvDataset(content: string): Hotspot[] {
-  const rows = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (rows.length < 2) {
-    return [];
-  }
-
-  const headers = rows[0].split(",").map((header) => header.trim().toLowerCase());
-
-  const readValue = (columns: string[], record: string[]) => {
-    const match = columns.find((column) => headers.includes(column));
-    if (!match) return "";
-    return record[headers.indexOf(match)]?.trim() ?? "";
-  };
-
-  const mapSeverity = (value: string, count: number): Hotspot["severity"] => {
-    const lower = value.toLowerCase();
-    if (lower === "critical" || lower === "high" || lower === "medium" || lower === "low") {
-      return lower;
-    }
-    return count >= 5 ? "critical" : count >= 3 ? "high" : count >= 2 ? "medium" : "low";
-  };
-
-  const mapType = (value: string): Hotspot["type"] => {
-    const lower = value.toLowerCase();
-    if (lower.includes("counterfeit")) return "counterfeit";
-    if (lower.includes("phishing")) return "phishing";
-    return "digital-arrest";
-  };
-
-  return rows.slice(1).flatMap((row, index) => {
-    const record = row.split(",");
-    const lat = Number(readValue(["latitude", "lat"], record));
-    const lng = Number(readValue(["longitude", "lng", "lon"], record));
-
-    if (Number.isNaN(lat) || Number.isNaN(lng)) {
-      return [];
-    }
-
-    const count = Number(readValue(["reportcount", "count", "reports"], record)) || 1;
-    const location = readValue(["locationlabel", "location", "place"], record) || `Imported hotspot ${index + 1}`;
-    const district = readValue(["district", "zone"], record) || deriveDistrict(location);
-    const latestReportAt = readValue(["latestreportat", "createdat", "timestamp"], record) || new Date().toISOString();
-
-    return [
-      {
-        id: `dataset-${index + 1}-${lat}-${lng}`,
-        lat,
-        lng,
-        type: mapType(readValue(["incidenttype", "type", "category"], record)),
-        severity: mapSeverity(readValue(["severity", "risk"], record), count),
-        count,
-        location,
-        district,
-        latestReportAt,
-        source: "dataset" as const,
-      },
-    ];
-  });
-}
-
 export default function GeospatialMapper() {
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
   const [baseHotspots, setBaseHotspots] = useState<Hotspot[]>(sampleHotspots);
-  const [datasetHotspots, setDatasetHotspots] = useState<Hotspot[]>([]);
   const [isLiveData, setIsLiveData] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | Hotspot["type"]>("all");
-  const [timeRange, setTimeRange] = useState<TimeRange>("all");
+  const timeRange: TimeRange = "all";
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
   const [deploymentState, setDeploymentState] = useState<DeploymentState>({});
 
   const loadHotspots = useCallback(async () => {
     try {
-      const response = await fetch(`/api/hotspots?range=${timeRange}`, { cache: "no-store" });
+      const response = await fetch(`/api/hotspots`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok || !payload.configured || !Array.isArray(payload.hotspots) || payload.hotspots.length === 0) {
         setBaseHotspots(sampleHotspots);
@@ -227,15 +160,17 @@ export default function GeospatialMapper() {
         locationLabel: string;
         reportCount: number;
         latestReportAt: string;
+        district?: string;
+        severity?: string;
       }) => ({
         id: hotspot.id,
         lat: hotspot.latitude,
         lng: hotspot.longitude,
         type: hotspot.incidentType,
-        severity: hotspot.reportCount >= 5 ? "critical" : hotspot.reportCount >= 3 ? "high" : hotspot.reportCount >= 2 ? "medium" : "low",
+        severity: (hotspot.severity as any) ?? (hotspot.reportCount >= 5 ? "critical" : hotspot.reportCount >= 3 ? "high" : hotspot.reportCount >= 2 ? "medium" : "low"),
         count: hotspot.reportCount,
         location: hotspot.locationLabel,
-        district: deriveDistrict(hotspot.locationLabel),
+        district: hotspot.district ?? deriveDistrict(hotspot.locationLabel),
         latestReportAt: hotspot.latestReportAt,
         source: "live" as const,
       })) as Hotspot[];
@@ -244,13 +179,14 @@ export default function GeospatialMapper() {
       setSelectedHotspot((current) => liveHotspots.find((item) => item.id === current?.id) ?? liveHotspots[0] ?? null);
       setIsLiveData(true);
       setLastUpdated(payload.polledAt ?? new Date().toISOString());
-    } catch {
+    } catch (e) {
+      console.error(e);
       setBaseHotspots(sampleHotspots);
       setSelectedHotspot((current) => current ?? sampleHotspots[0] ?? null);
       setIsLiveData(false);
       setLastUpdated(new Date().toISOString());
     }
-  }, [timeRange]);
+  }, []);
 
   useEffect(() => {
     void loadHotspots();
@@ -265,7 +201,7 @@ export default function GeospatialMapper() {
     return () => window.clearInterval(interval);
   }, [autoRefresh, loadHotspots]);
 
-  const hotspots = useMemo(() => [...datasetHotspots, ...baseHotspots], [baseHotspots, datasetHotspots]);
+  const hotspots = useMemo(() => baseHotspots, [baseHotspots]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -366,22 +302,6 @@ export default function GeospatialMapper() {
     });
   };
 
-  const handleDatasetImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const content = await file.text();
-    const parsed = parseCsvDataset(content);
-    if (!parsed.length) {
-      setImportStatus("CSV did not contain usable latitude/longitude incident rows.");
-      return;
-    }
-
-    setDatasetHotspots(parsed);
-    setImportStatus(`Loaded ${parsed.length} dataset hotspot${parsed.length === 1 ? "" : "s"} into the live map.`);
-    setSelectedHotspot(parsed[0] ?? null);
-  };
-
   const handleShareIntel = async () => {
     const bulletin = [
       "RUBIX Inter-District Intelligence Bulletin",
@@ -419,25 +339,15 @@ export default function GeospatialMapper() {
           </div>
 
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#222] bg-black/40 p-3">
-            {(["all", "hour", "day", "week"] as const).map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`rounded border px-3 py-1.5 text-xs font-mono transition-colors ${timeRange === range ? "border-[#00f3ff] bg-[#00f3ff]/20 text-[#00f3ff]" : "border-[#333] text-gray-400 hover:border-[#00f3ff]/50"}`}
-              >
-                {range === "all" ? "ALL TIME" : `LAST ${range.toUpperCase()}`}
-              </button>
-            ))}
+            <div className="rounded border border-[#00f3ff]/50 bg-[#00f3ff]/10 px-3 py-1.5 text-xs font-mono text-[#00f3ff]">
+              ALL TIME
+            </div>
             <button
               onClick={() => setShowHeatmap((current) => !current)}
               className={`rounded border px-3 py-1.5 text-xs font-mono transition-colors ${showHeatmap ? "border-[#ff7a00] bg-[#ff7a00]/15 text-[#ffb86b]" : "border-[#333] text-gray-400 hover:border-[#ff7a00]/50"}`}
             >
               <Radar className="mr-1 inline h-3 w-3" /> {showHeatmap ? "HEATMAP ON" : "HEATMAP OFF"}
             </button>
-            <label className="cursor-pointer rounded border border-[#333] px-3 py-1.5 text-xs font-mono text-gray-400 transition-colors hover:border-[#00ff66]/50 hover:text-[#00ff66]">
-              <Upload className="mr-1 inline h-3 w-3" /> IMPORT CSV
-              <input type="file" accept=".csv,text/csv" onChange={handleDatasetImport} className="hidden" />
-            </label>
             {lastUpdated && <span className="ml-auto text-[11px] font-mono text-gray-500">Last updated {new Date(lastUpdated).toLocaleTimeString()}</span>}
           </div>
 
@@ -592,7 +502,7 @@ export default function GeospatialMapper() {
             <Activity className="h-5 w-5 text-gray-400" />
             <h3 className="font-mono text-sm uppercase tracking-widest text-gray-300">Statistics</h3>
           </div>
-          <div className="grid grid-cols-2 gap-4 p-4">
+          <div className="grid grid-cols-3 gap-4 p-4">
             <div className="rounded-lg border border-[#333333] bg-black/70 p-3">
               <p className="text-xs font-mono text-gray-500">Total hotspots</p>
               <p className="text-lg font-bold font-mono text-white">{hotspots.length}</p>
@@ -604,10 +514,6 @@ export default function GeospatialMapper() {
             <div className="rounded-lg border border-[#333333] bg-black/70 p-3">
               <p className="text-xs font-mono text-gray-500">Districts</p>
               <p className="text-lg font-bold font-mono text-white">{new Set(hotspots.map((hotspot) => hotspot.district)).size}</p>
-            </div>
-            <div className="rounded-lg border border-[#333333] bg-black/70 p-3">
-              <p className="text-xs font-mono text-gray-500">Imported rows</p>
-              <p className="text-lg font-bold font-mono text-[#00f3ff]">{datasetHotspots.length}</p>
             </div>
           </div>
         </div>
@@ -634,7 +540,6 @@ export default function GeospatialMapper() {
               <Copy className="mr-2 inline h-4 w-4" /> COPY DISTRICT BULLETIN
             </button>
             {shareStatus && <p className="text-xs text-gray-400">{shareStatus}</p>}
-            {importStatus && <p className="text-xs text-[#00ff66]">{importStatus}</p>}
           </div>
         </div>
       </div>
