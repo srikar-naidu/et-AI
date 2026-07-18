@@ -35,35 +35,33 @@ export default function PhishingDisassembler() {
   // Graph Data
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
 
-  const analyzeText = () => {
+  const analyzeText = async () => {
     if (!inputText.trim()) return;
     
     setIsAnalyzing(true);
     setResult(null);
     setShowGraph(false);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/phishing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: inputText })
+      });
+      const data = await res.json();
+
       const lowerText = inputText.toLowerCase();
       const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
       const urls = inputText.match(urlRegex);
       const extractedUrl = urls ? urls[0] : null;
 
       let score = 0;
-      let triggerCount = 0;
-      
-      PSYCHOLOGICAL_TRIGGERS.forEach(trigger => {
-        if (lowerText.includes(trigger)) triggerCount++;
-      });
+      if (data.urgencyLevel === "Critical") score = 95;
+      else if (data.urgencyLevel === "High") score = 80;
+      else if (data.urgencyLevel === "Medium") score = 50;
+      else score = 20;
 
-      if (triggerCount > 0) score += Math.min(triggerCount * 20, 50);
-      if (extractedUrl) {
-        score += 30;
-        if (extractedUrl.includes(".xyz") || extractedUrl.includes(".tk") || extractedUrl.includes("bit.ly")) {
-          score += 20;
-        }
-      }
-
-      const isPhishing = score > 60;
+      const isPhishing = score > 60 || data.threatType !== "None";
 
       let highlighted = inputText;
       PSYCHOLOGICAL_TRIGGERS.forEach(trigger => {
@@ -81,33 +79,32 @@ export default function PhishingDisassembler() {
         score,
         extractedUrl,
         domainInfo: extractedUrl ? {
-          age: isPhishing ? "2 Days Old" : "4 Years Old",
-          location: isPhishing ? "St. Petersburg, RU" : "Mumbai, IN",
-          registrar: isPhishing ? "Hidden/PrivacyGuard" : "GoDaddy / AWS",
+          age: data.domainAge || "Unknown",
+          location: data.location || "Unknown",
+          registrar: "Hidden/PrivacyGuard",
         } : null,
-        highlightedText: highlighted
+        highlightedText: highlighted,
+        explanation: data.explanation // added to use in UI below
       });
 
-      // Mock graph data connecting the URL to known threats
       if (extractedUrl && isPhishing) {
         setGraphData({
           nodes: [
             { id: extractedUrl, group: 1, val: 20, color: "#ff003c", name: "Extracted URL" },
             { id: "Malicious IP 1", group: 2, val: 10, color: "#00f3ff", name: "Known Phishing Server" },
-            { id: "Malicious IP 2", group: 2, val: 10, color: "#00f3ff", name: "Botnet Node" },
             { id: "Suspicious TLD", group: 3, val: 15, color: "orange", name: "High-Risk Registrar" }
           ] as any,
           links: [
             { source: extractedUrl, target: "Malicious IP 1" },
-            { source: extractedUrl, target: "Malicious IP 2" },
-            { source: extractedUrl, target: "Suspicious TLD" },
-            { source: "Malicious IP 1", target: "Malicious IP 2" }
+            { source: extractedUrl, target: "Suspicious TLD" }
           ] as any
         });
       }
-
+    } catch (err) {
+      console.error(err);
+    } finally {
       setIsAnalyzing(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -282,7 +279,7 @@ export default function PhishingDisassembler() {
                 {result.isPhishing && (
                   <div className="mt-auto bg-[#ff003c]/10 border border-[#ff003c] rounded-lg p-4">
                     <p className="text-[#ff003c] font-mono text-sm">
-                      <strong>WARNING:</strong> This URL points to a newly registered domain often associated with credential harvesting. The message uses urgency to manipulate you into clicking. Do not interact with the link.
+                      <strong>AI ANALYSIS:</strong> {result.explanation || "This URL points to a newly registered domain often associated with credential harvesting. The message uses urgency to manipulate you into clicking. Do not interact with the link."}
                     </p>
                   </div>
                 )}
