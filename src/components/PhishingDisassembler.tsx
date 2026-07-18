@@ -23,6 +23,7 @@ interface AnalysisResult {
     registrar: string;
   } | null;
   highlightedText: string;
+  explanation: string;
 }
 
 export default function PhishingDisassembler() {
@@ -56,12 +57,19 @@ export default function PhishingDisassembler() {
       const extractedUrl = urls ? urls[0] : null;
 
       let score = 0;
-      if (data.urgencyLevel === "Critical") score = 95;
-      else if (data.urgencyLevel === "High") score = 80;
-      else if (data.urgencyLevel === "Medium") score = 50;
-      else score = 20;
+      if (data.threatType === "N/A" || data.threatType === "None") {
+        score = 0; // Benign message, low score
+      } else if (data.urgencyLevel === "Critical") {
+        score = 95;
+      } else if (data.urgencyLevel === "High") {
+        score = 80;
+      } else if (data.urgencyLevel === "Medium") {
+        score = 50;
+      } else {
+        score = 20;
+      }
 
-      const isPhishing = score > 60 || data.threatType !== "None";
+      const isPhishing = score > 60;
 
       let highlighted = inputText;
       PSYCHOLOGICAL_TRIGGERS.forEach(trigger => {
@@ -226,7 +234,7 @@ export default function PhishingDisassembler() {
                     {result.isPhishing ? "CRITICAL THREAT" : "SAFE MESSAGE"}
                   </h2>
                   <p className="text-gray-400 font-mono text-sm mt-1">
-                    Risk Score: <span className="text-white">{result.score}/100</span>
+                    Risk Score: <span className={`font-bold ${result.score < 30 ? "text-[#00ff66]" : result.score <= 60 ? "text-yellow-400" : "text-[#ff003c]"}`}>{result.score}/100</span>
                   </p>
                 </div>
               </div>

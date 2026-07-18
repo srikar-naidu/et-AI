@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
+import { getGroqApiKey } from "@/lib/server-env";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = getGroqApiKey();
     if (!apiKey) {
       return NextResponse.json({ error: "GROQ_API_KEY not configured" }, { status: 500 });
     }

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured, isSupabaseClientConfigured } from "@/lib/supabase/server";
+import { getGroqApiKey } from "@/lib/server-env";
 
 function getServiceStatus() {
   const services = [] as Array<{ label: string; status: string; detail: string }>;
 
-  const groqConfigured = Boolean(process.env.GROQ_API_KEY);
+  const groqConfigured = Boolean(getGroqApiKey());
   const supabaseConfigured = isSupabaseConfigured();
   const supabaseClientConfigured = isSupabaseClientConfigured();
   const auriginConfigured = Boolean(process.env.AURIGIN_API_KEY);

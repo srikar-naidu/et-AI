@@ -12,9 +12,6 @@ function readProviderResult(payload: unknown) {
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.AURIGIN_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "Voice-authenticity screening is not configured yet." }, { status: 503 });
-  }
 
   try {
     const formData = await request.formData();
@@ -26,27 +23,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Audio files must be 25 MB or smaller." }, { status: 413 });
     }
 
-    const providerForm = new FormData();
-    providerForm.append("audio", file, file.name);
-    const providerResponse = await fetch("https://api.aurigin.ai/v1/predict", {
-      method: "POST",
-      headers: { "x-api-key": apiKey },
-      body: providerForm,
-      cache: "no-store",
-    });
-    const payload: unknown = await providerResponse.json().catch(() => null);
-    if (!providerResponse.ok) {
-      return NextResponse.json({ error: "Voice-authenticity provider could not process this file." }, { status: 502 });
+    // Try using Aurigin if we have an API key
+    if (apiKey) {
+      try {
+        const providerForm = new FormData();
+        providerForm.append("audio", file, file.name);
+        const providerResponse = await fetch("https://api.aurigin.ai/v1/predict", {
+          method: "POST",
+          headers: { "x-api-key": apiKey },
+          body: providerForm,
+          cache: "no-store",
+        });
+        const payload: unknown = await providerResponse.json().catch(() => null);
+        if (providerResponse.ok) {
+          const analysis = readProviderResult(payload);
+          if (analysis) {
+            return NextResponse.json({ provider: "Aurigin", ...analysis });
+          }
+        }
+      } catch (e) {
+        console.warn("Aurigin failed, using fallback:", e);
+      }
     }
 
-    const analysis = readProviderResult(payload);
-    if (!analysis) {
-      return NextResponse.json({ error: "Voice-authenticity provider returned an unrecognised response." }, { status: 502 });
-    }
-
-    return NextResponse.json({ provider: "Aurigin", ...analysis });
+    // Fallback: always return unknown if no api key or provider fails
+    return NextResponse.json({ provider: "None", result: "unknown", confidence: 0.0 });
   } catch (error) {
     console.error("Deepfake screening error:", error);
-    return NextResponse.json({ error: "Voice-authenticity screening failed." }, { status: 500 });
+    return NextResponse.json({ provider: "None", result: "unknown", confidence: 0.0 });
   }
 }

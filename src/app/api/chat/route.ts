@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
+import { getGroqApiKey } from "@/lib/server-env";
 
 const SYSTEM_PROMPT_TEMPLATE = `You are the Citizen Fraud Shield Assistant, an official conversational AI for the Digital Public Safety Command Center. 
 Your job is to assist citizens who suspect they are being targeted by a scam, specifically digital arrests, phishing, or financial fraud.
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const { messages, language } = await request.json();
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = getGroqApiKey();
     if (!apiKey) {
       return NextResponse.json({ error: "GROQ_API_KEY not configured." }, { status: 500 });
     }

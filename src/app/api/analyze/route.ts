@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
+import { getGroqApiKey } from "@/lib/server-env";
 
 const SYSTEM_PROMPT = `You are a real-time scam call analyzer embedded in a public safety system. You will receive a transcript of an ongoing phone call. Your job is to analyze it for signs of a "Digital Arrest" scam or any fraud/manipulation attempt.
 
@@ -48,8 +49,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
-    console.log("GROQ_API_KEY loaded:", apiKey ? `${apiKey.substring(0, 8)}...` : "MISSING");
+    const apiKey = getGroqApiKey();
 
     if (!apiKey) {
       return NextResponse.json(
