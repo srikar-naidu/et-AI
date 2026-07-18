@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Digital Safety Command Center",
-  description: "AI-Powered Threat Detection & Public Safety Suite",
+  title: "RUBIX - Digital Safety Command Center",
+  description: "AI-powered Threat Detection & Public Safety Suite",
 };
 
 export default function RootLayout({

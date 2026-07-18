@@ -1,25 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
-import { ShieldAlert, ScanLine, Link as LinkIcon, Activity, MapPin, FileWarning, Network, FolderSearch, Siren } from "lucide-react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import {
+  ShieldAlert,
+  ScanLine,
+  Link as LinkIcon,
+  Activity,
+  MapPin,
+  FileWarning,
+  Network,
+  FolderSearch,
+  Siren,
+  ArrowLeft,
+  ChevronRight,
+} from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
 import DeepfakeAnalyzer from "@/components/DeepfakeAnalyzer";
 import ChatbotWidget from "@/components/ChatbotWidget";
 
-const GeospatialMapper = dynamic(() => import("@/components/GeospatialMapper"), { ssr: false });
+const GeospatialMapper = dynamic(() => import("@/components/GeospatialMapper"), {
+  ssr: false,
+});
 import CitizenReport from "@/components/CitizenReport";
 import FraudNetwork from "@/components/FraudNetwork";
 import CaseConsole from "@/components/CaseConsole";
 import ReportingGuide from "@/components/ReportingGuide";
-import ServiceReadinessPanel from "@/components/ServiceReadinessPanel";
-import OperatorAuthPanel from "@/components/OperatorAuthPanel";
 
 function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const springConfig = { stiffness: 600, damping: 30 };
+  const x = useSpring(mouseX, springConfig);
+  const y = useSpring(mouseY, springConfig);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const { clientX, clientY } = e;
+      const { innerWidth, innerHeight } = window;
+      mouseX.set((clientX / innerWidth - 0.5) * 40);
+      mouseY.set((clientY / innerHeight - 0.5) * 40);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [mouseX, mouseY]);
 
   const modules = [
     {
@@ -27,124 +56,256 @@ function Home() {
       title: "Live Call Shield",
       description: "Real-time audio interception & AI analysis for Digital Arrest scams.",
       icon: <Activity className="w-8 h-8 text-[#00f3ff]" />,
-      color: "border-[#00f3ff]",
+      color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
+      bgColor: "bg-[#00f3ff]/10",
+      glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
     },
     {
       id: "counterfeit-scanner",
       title: "Counterfeit Scanner",
       description: "Computer vision webcam feed to detect fake currency & IDs.",
       icon: <ScanLine className="w-8 h-8 text-[#00ff66]" />,
-      color: "border-[#00ff66]",
+      color: "border-[#00ff66]/30 hover:border-[#00ff66]",
+      bgColor: "bg-[#00ff66]/10",
+      glowColor: "shadow-[0_0_30px_rgba(0,255,102,0.2)]",
     },
     {
       id: "phishing-disassembler",
       title: "Phishing Disassembler",
       description: "Deep AI & network analysis of malicious URLs and SMS texts.",
       icon: <LinkIcon className="w-8 h-8 text-[#ff003c]" />,
-      color: "border-[#ff003c]",
+      color: "border-[#ff003c]/30 hover:border-[#ff003c]",
+      bgColor: "bg-[#ff003c]/10",
+      glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
     },
     {
       id: "deepfake-analyzer",
       title: "Deepfake Analyzer",
       description: "Deepfake audio detection & transcription analysis for voice scams.",
       icon: <ShieldAlert className="w-8 h-8 text-purple-400" />,
-      color: "border-purple-400",
+      color: "border-purple-400/30 hover:border-purple-400",
+      bgColor: "bg-purple-400/10",
+      glowColor: "shadow-[0_0_30px_rgba(168,85,247,0.2)]",
     },
     {
       id: "geospatial-mapper",
       title: "Geospatial Mapper",
-      description: "Geospatial AI layer for law enforcement that maps fraud complaint locations, counterfeit currency seizure points, and cybercrime hotspots — enabling patrol prioritisation, resource deployment, and inter-district intelligence sharing in near real time through a command centre interface.",
+      description:
+        "Geospatial AI layer for law enforcement that maps fraud complaint locations and cybercrime hotspots.",
       icon: <MapPin className="w-8 h-8 text-amber-400" />,
-      color: "border-amber-400",
+      color: "border-amber-400/30 hover:border-amber-400",
+      bgColor: "bg-amber-400/10",
+      glowColor: "shadow-[0_0_30px_rgba(251,191,36,0.2)]",
     },
     {
       id: "citizen-report",
       title: "Citizen Incident Report",
       description: "Create a secure case record and add anonymised incident signals to the map.",
       icon: <FileWarning className="w-8 h-8 text-[#00f3ff]" />,
-      color: "border-[#00f3ff]",
+      color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
+      bgColor: "bg-[#00f3ff]/10",
+      glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
     },
     {
       id: "fraud-network",
       title: "Fraud Network Intelligence",
       description: "Explore linked accounts, transfers, and flagged AML patterns with explainable risk signals.",
       icon: <Network className="w-8 h-8 text-[#ff003c]" />,
-      color: "border-[#ff003c]",
+      color: "border-[#ff003c]/30 hover:border-[#ff003c]",
+      bgColor: "bg-[#ff003c]/10",
+      glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
     },
-    { id: "case-console", title: "Case & Evidence Console", description: "Review case timelines, preserve evidence hashes, and export investigation bundles.", icon: <FolderSearch className="w-8 h-8 text-[#00ff66]" />, color: "border-[#00ff66]" },
-    { id: "reporting-guide", title: "Official Reporting Guide", description: "Prepare evidence, call the right helpline, and continue to official cybercrime reporting.", icon: <Siren className="w-8 h-8 text-[#ff003c]" />, color: "border-[#ff003c]" },
+    {
+      id: "case-console",
+      title: "Case & Evidence Console",
+      description: "Review case timelines, preserve evidence hashes, and export investigation bundles.",
+      icon: <FolderSearch className="w-8 h-8 text-[#00ff66]" />,
+      color: "border-[#00ff66]/30 hover:border-[#00ff66]",
+      bgColor: "bg-[#00ff66]/10",
+      glowColor: "shadow-[0_0_30px_rgba(0,255,102,0.2)]",
+    },
+    {
+      id: "reporting-guide",
+      title: "Official Reporting Guide",
+      description: "Prepare evidence, call the right helpline, and continue to official cybercrime reporting.",
+      icon: <Siren className="w-8 h-8 text-[#ff003c]" />,
+      color: "border-[#ff003c]/30 hover:border-[#ff003c]",
+      bgColor: "bg-[#ff003c]/10",
+      glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
+    },
   ];
 
   return (
-    <main className="min-h-screen p-8 flex flex-col items-center">
-      {/* Header */}
-      <header className="w-full max-w-6xl mb-12 flex justify-between items-center border-b border-[#333333] pb-4">
-        <div className="flex items-center gap-3">
-          <ShieldAlert className="w-10 h-10 text-[#00f3ff]" />
-          <div>
-            <h1 className="text-3xl font-mono font-bold tracking-wider text-white uppercase">
-              Digital Safety <span className="text-[#00f3ff]">Command Center</span>
-            </h1>
-            <p className="text-sm font-mono text-gray-400">
-              SYS.STATUS: <span className="text-[#00ff66]">ONLINE & MONITORING</span>
-            </p>
-          </div>
-        </div>
-      </header>
+    <main className="min-h-screen flex flex-col items-center relative overflow-hidden">
+      {/* Animated Background Gradient Orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <motion.div
+          className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-[#00f3ff]/20 blur-[100px]"
+          animate={{
+            x: [0, 40, 0],
+            y: [0, 30, 0],
+            scale: [1, 1.1, 1],
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-[#ff003c]/20 blur-[100px]"
+          animate={{
+            x: [0, -40, 0],
+            y: [0, -30, 0],
+            scale: [1, 1.15, 1],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        />
+        <motion.div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-[#00ff66]/10 blur-[120px]"
+          animate={{
+            x: ["-50%", "-45%", "-50%"],
+            y: ["-50%", "-55%", "-50%"],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
 
-      {/* Main Content Area */}
-      <div className="w-full max-w-6xl grow flex flex-col items-center justify-center">
-        <div className="mb-8 w-full space-y-4">
-          <ServiceReadinessPanel />
-          <OperatorAuthPanel />
-        </div>
-        {!activeModule ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
-            {modules.map((mod, i) => (
-              <motion.button
-                key={mod.id}
-                initial={{ opacity: 0, y: 20 }}
+      {/* Content */}
+      <div className="relative z-10 w-full flex flex-col items-center px-4 py-12">
+        {/* Header */}
+        <header className="w-full max-w-7xl mb-16 flex flex-col md:flex-row justify-between items-center gap-8">
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="flex items-center gap-4"
+          >
+            <div className="relative">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#00f3ff] via-[#00ff66] to-[#ff003c] flex items-center justify-center shadow-[0_0_40px_rgba(0,243,255,0.4)]">
+                <ShieldAlert className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-white">
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#00f3ff] via-[#00ff66] to-[#ff003c]">
+                  RUBIX
+                </span>
+              </h1>
+              <p className="text-sm md:text-base font-mono text-gray-400 mt-1">
+                Digital Safety Command Center
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+            className="flex items-center gap-3 px-5 py-2.5 rounded-full border border-[#333] bg-[#0d0d0d]/80 backdrop-blur-md"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ff66] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#00ff66]"></span>
+            </span>
+            <span className="text-sm font-mono text-[#00ff66]">ONLINE & MONITORING</span>
+          </motion.div>
+        </header>
+
+        {/* Main Content Area */}
+        <div className="w-full max-w-7xl grow flex flex-col items-center justify-center">
+          {!activeModule ? (
+            <div className="w-full">
+              {/* Hero Intro */}
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                onClick={() => setActiveModule(mod.id)}
-                className={`bg-[#111111] border ${mod.color} p-6 rounded-lg cursor-pointer hover:bg-[#1a1a1a] transition-all relative overflow-hidden group text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#00f3ff]`}
+                transition={{ duration: 0.9, ease: "easeOut", delay: 0.3 }}
+                className="mb-12 text-center max-w-3xl mx-auto"
               >
-                {/* Neon Glow Effect on Hover */}
-                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                
-                <div className="mb-4 bg-black/50 w-16 h-16 rounded-full flex items-center justify-center border border-[#333333]">
-                  {mod.icon}
-                </div>
-                <h2 className="text-xl font-bold font-mono text-white mb-2">{mod.title}</h2>
-                <p className="text-sm text-gray-400">{mod.description}</p>
-              </motion.button>
-            ))}
-          </div>
-        ) : (
-          <div className="w-full flex flex-col h-full">
-            <div className="mb-4">
-              <button
-                onClick={() => setActiveModule(null)}
-                className="text-[#00f3ff] hover:text-white font-mono text-sm border border-[#00f3ff] px-4 py-2 rounded transition-colors"
+                <h2 className="text-3xl md:text-6xl font-bold text-white mb-6 leading-tight">
+                  Protect What Matters.
+                  <br />
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#00f3ff] to-[#00ff66]">
+                    Analyze. Respond. Secure.
+                  </span>
+                </h2>
+                <p className="text-lg md:text-xl text-gray-400 leading-relaxed">
+                  AI-powered threat detection and public safety suite for modern digital challenges.
+                </p>
+              </motion.div>
+
+              {/* Modules Grid */}
+              <motion.div
+                style={{ x, y }}
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full"
               >
-                &larr; BACK TO TERMINAL
-              </button>
+                {modules.map((mod, i) => (
+                  <motion.button
+                    key={mod.id}
+                    initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      delay: i * 0.08,
+                      duration: 0.6,
+                      ease: "easeOut",
+                    }}
+                    whileHover={{ scale: 1.02, y: -4 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setActiveModule(mod.id)}
+                    className={`group relative bg-[#0d0d0d]/90 backdrop-blur-md border-2 ${mod.color} p-7 rounded-2xl cursor-pointer transition-all duration-300 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050505] focus-visible:ring-[#00f3ff]`}
+                  >
+                    {/* Background Glow on Hover */}
+                    <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${mod.glowColor}`} />
+
+                    <div className="relative z-10">
+                      <div
+                        className={`mb-5 w-16 h-16 rounded-xl ${mod.bgColor} flex items-center justify-center border border-white/5 group-hover:scale-110 transition-transform duration-300`}
+                      >
+                        {mod.icon}
+                      </div>
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <h3 className="text-xl font-bold text-white">{mod.title}</h3>
+                        <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-all duration-300" />
+                      </div>
+                      <p className="text-sm text-gray-400 leading-relaxed">
+                        {mod.description}
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
+              </motion.div>
             </div>
-            
-            {/* Module Rendering Space */}
-            <div className="grow bg-[#111111] border border-[#333333] rounded-xl p-6">
-              {activeModule === "voice-shield" && <VoiceShield />}
-              {activeModule === "counterfeit-scanner" && <CounterfeitScanner />}
-              {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
-              {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
-              {activeModule === "geospatial-mapper" && <GeospatialMapper />}
-              {activeModule === "citizen-report" && <CitizenReport />}
-              {activeModule === "fraud-network" && <FraudNetwork />}
-              {activeModule === "case-console" && <CaseConsole />}
-              {activeModule === "reporting-guide" && <ReportingGuide />}
-            </div>
-          </div>
-        )}
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="w-full flex flex-col"
+            >
+              <div className="mb-6">
+                <motion.button
+                  whileHover={{ x: -4 }}
+                  onClick={() => setActiveModule(null)}
+                  className="flex items-center gap-2 text-white/80 hover:text-white font-medium text-sm px-4 py-2.5 rounded-xl border border-[#333] hover:border-[#00f3ff] bg-[#0d0d0d]/80 backdrop-blur-md transition-all duration-300"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Modules
+                </motion.button>
+              </div>
+
+              {/* Module Rendering Space */}
+              <div className="bg-[#0d0d0d]/90 backdrop-blur-xl border border-[#333] rounded-2xl p-6 md:p-8 shadow-[0_0_60px_rgba(0,0,0,0.5)]">
+                {activeModule === "voice-shield" && <VoiceShield />}
+                {activeModule === "counterfeit-scanner" && <CounterfeitScanner />}
+                {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
+                {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
+                {activeModule === "geospatial-mapper" && <GeospatialMapper />}
+                {activeModule === "citizen-report" && <CitizenReport />}
+                {activeModule === "fraud-network" && <FraudNetwork />}
+                {activeModule === "case-console" && <CaseConsole />}
+                {activeModule === "reporting-guide" && <ReportingGuide />}
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
 
       {/* Global Expansion Widgets */}
