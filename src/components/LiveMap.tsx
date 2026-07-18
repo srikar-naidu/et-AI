@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
-import type { LatLngExpression } from "leaflet";
+import { useEffect, useMemo } from "react";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import type { LatLngExpression, Map as LeafletMap } from "leaflet";
 import L from "leaflet";
+import "leaflet.heat";
 import "leaflet/dist/leaflet.css";
 
 interface Hotspot {
@@ -14,6 +15,40 @@ interface Hotspot {
   severity: "low" | "medium" | "high" | "critical";
   count: number;
   location: string;
+  district: string;
+  latestReportAt: string;
+  source: "sample" | "live" | "dataset";
+}
+
+function HeatLayer({ hotspots, visible }: { hotspots: Hotspot[]; visible: boolean }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!visible || !hotspots.length) return;
+
+    const heatPoints = hotspots.map((hotspot) => [hotspot.lat, hotspot.lng, Math.max(0.2, hotspot.count / 10)]) as [number, number, number][];
+    const heatLayer = (L as typeof L & {
+      heatLayer: (points: [number, number, number][], options?: Record<string, unknown>) => { addTo: (map: LeafletMap) => void; remove: () => void };
+    }).heatLayer(heatPoints, {
+      radius: 26,
+      blur: 20,
+      maxZoom: 10,
+      gradient: {
+        0.2: "#00ff66",
+        0.45: "#facc15",
+        0.7: "#f97316",
+        1.0: "#ff003c",
+      },
+    });
+
+    heatLayer.addTo(map);
+
+    return () => {
+      heatLayer.remove();
+    };
+  }, [hotspots, map, visible]);
+
+  return null;
 }
 
 function createMarkerIcon(color: string) {
@@ -29,10 +64,12 @@ export default function LiveMap({
   hotspots,
   selectedHotspot,
   onSelect,
+  showHeatmap,
 }: {
   hotspots: Hotspot[];
   selectedHotspot: Hotspot | null;
   onSelect: (hotspot: Hotspot) => void;
+  showHeatmap: boolean;
 }) {
   const center = useMemo<LatLngExpression>(() => {
     if (hotspots.length) {
@@ -47,6 +84,7 @@ export default function LiveMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <HeatLayer hotspots={hotspots} visible={showHeatmap} />
       {hotspots.map((hotspot) => {
         const iconColor = hotspot.severity === "critical" ? "#ff003c" : hotspot.severity === "high" ? "#f97316" : hotspot.severity === "medium" ? "#facc15" : "#00ff66";
         return (

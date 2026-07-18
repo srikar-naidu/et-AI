@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { isSupabaseConfigured, supabaseRest } from "@/lib/supabase/server";
 
 type ComplaintRow = {
@@ -10,14 +10,32 @@ type ComplaintRow = {
   created_at: string;
 };
 
-export async function GET() {
+function getRangeStart(range: string) {
+  const now = new Date();
+  switch (range) {
+    case "hour":
+      return new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    case "day":
+      return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    case "week":
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    default:
+      return null;
+  }
+}
+
+export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ configured: false, hotspots: [] });
   }
 
   try {
+    const range = request.nextUrl.searchParams.get("range") ?? "all";
+    const rangeStart = getRangeStart(range);
+    const createdAtFilter = rangeStart ? `&created_at=gte.${encodeURIComponent(rangeStart)}` : "";
+
     const complaints = await supabaseRest<ComplaintRow[]>(
-      "complaints?select=id,incident_type,location_label,latitude,longitude,created_at&latitude=not.is.null&longitude=not.is.null&order=created_at.desc&limit=500",
+      `complaints?select=id,incident_type,location_label,latitude,longitude,created_at&latitude=not.is.null&longitude=not.is.null${createdAtFilter}&order=created_at.desc&limit=500`,
     );
     const groups = new Map<string, ComplaintRow[]>();
     for (const complaint of complaints) {
@@ -35,7 +53,7 @@ export async function GET() {
       latestReportAt: items[0].created_at,
     }));
 
-    return NextResponse.json({ configured: true, hotspots });
+    return NextResponse.json({ configured: true, range, hotspots, polledAt: new Date().toISOString() });
   } catch (error) {
     console.error("Hotspot request error:", error);
     return NextResponse.json({ error: "Could not load incident hotspots." }, { status: 500 });
