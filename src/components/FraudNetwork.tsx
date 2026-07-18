@@ -36,7 +36,7 @@ export default function FraudNetwork() {
         <div>
           <div className="flex items-center gap-2 text-[#00f3ff]"><Network className="size-5" /><span className="font-mono text-xs font-bold tracking-widest">INVESTIGATION GRAPH</span></div>
           <h2 className="mt-2 text-2xl font-bold text-white">Trace suspicious money movement</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-300">Relationships are generated from synthetic AMLSim data for demonstration. They are investigative leads, not proof of wrongdoing.</p>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-300">This interactive map visualises the AMLSim (Anti-Money Laundering) transaction data you provided. Each dot is an account or individual, and lines show the flow of money between them. Clustered red dots highlight potential money laundering rings or linked scam networks based on the transaction data.</p>
         </div>
         <button onClick={loadGraph} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#00f3ff]/50 px-3 text-sm font-semibold text-[#00f3ff] hover:bg-[#00f3ff]/10"><RefreshCw className="size-4" /> Refresh</button>
       </div>

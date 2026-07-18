@@ -79,12 +79,15 @@ export default function ChatbotWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: [...messages, userMessage], language }),
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
+      } else {
+        setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I am currently facing a technical issue. (Error: " + (data.error || "Unknown") + ")" }]);
       }
     } catch (err) {
       console.error(err);
+      setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I am currently facing a network error." }]);
     } finally {
       setIsLoading(false);
     }

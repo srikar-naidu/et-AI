@@ -53,7 +53,7 @@ function Home() {
     {
       id: "geospatial-mapper",
       title: "Geospatial Mapper",
-      description: "Real-time crime hotspot mapping & patrol optimization.",
+      description: "Geospatial AI layer for law enforcement that maps fraud complaint locations, counterfeit currency seizure points, and cybercrime hotspots — enabling patrol prioritisation, resource deployment, and inter-district intelligence sharing in near real time through a command centre interface.",
       icon: <MapPin className="w-8 h-8 text-amber-400" />,
       color: "border-amber-400",
     },
