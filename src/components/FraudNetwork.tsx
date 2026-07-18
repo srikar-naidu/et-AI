@@ -51,12 +51,28 @@ export default function FraudNetwork() {
           {graph.nodes.length > 0 ? (
             activeTab === "graph" ? (
               <ForceGraph2D
-                graphData={{ nodes: graph.nodes, links: graph.links }}
-                nodeLabel={(node) => `${(node as GraphNode).label} · risk ${(node as GraphNode).riskScore}`}
-                nodeColor={(node) => ((node as GraphNode).riskScore >= 70 ? "#ff003c" : "#00f3ff")}
-                nodeRelSize={5}
+                graphData={{ 
+                  // Deep clone to prevent ForceGraph from mutating our state objects and breaking the data table
+                  nodes: graph.nodes.map(n => ({...n})), 
+                  links: graph.links.map(l => ({...l})) 
+                }}
+                nodeLabel={(node) => {
+                  const n = node as GraphNode;
+                  return `${n.label} (${n.type}) · risk ${n.riskScore}`;
+                }}
+                nodeColor={(node) => {
+                  const n = node as GraphNode;
+                  if (n.riskScore >= 70) return "#ff003c";
+                  if (n.type === "account") return "#00f3ff";
+                  if (n.type === "individual") return "#00ff66";
+                  if (n.type === "organization") return "#a855f7";
+                  return "#ffffff";
+                }}
+                nodeRelSize={6}
                 linkColor={(link) => ((link as GraphLink).flagged ? "#ff003c" : "#52606d")}
-                linkWidth={(link) => ((link as GraphLink).flagged ? 2 : 0.7)}
+                linkWidth={(link) => ((link as GraphLink).flagged ? 2 : 1)}
+                linkDirectionalArrowLength={3.5}
+                linkDirectionalArrowRelPos={1}
                 backgroundColor="#090d10"
               />
             ) : (
@@ -75,8 +91,12 @@ export default function FraudNetwork() {
                     </thead>
                     <tbody className="divide-y divide-[#333]">
                       {graph.links.map((link, idx) => {
-                        const sourceNode = graph.nodes.find(n => n.id === link.source) || { label: link.source as string };
-                        const targetNode = graph.nodes.find(n => n.id === link.target) || { label: link.target as string };
+                        // Safe extraction in case react-force-graph mutated the link source/target internally
+                        const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+                        const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+                        
+                        const sourceNode = graph.nodes.find(n => n.id === sourceId) || { label: String(sourceId) };
+                        const targetNode = graph.nodes.find(n => n.id === targetId) || { label: String(targetId) };
                         return (
                           <tr key={idx} className="hover:bg-white/5 transition-colors">
                             <td className="px-4 py-3 font-mono">{sourceNode.label}</td>
