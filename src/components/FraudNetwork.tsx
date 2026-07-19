@@ -15,10 +15,6 @@ import {
   Cell,
   LineChart,
   Line,
-  Treemap,
-  ScatterChart,
-  Scatter,
-  ZAxis,
   AreaChart,
   Area,
 } from "recharts";
@@ -36,7 +32,6 @@ import {
   Link,
   Grid3x3,
   BoxSelect,
-  ScatterChart as ScatterIcon,
   Filter,
   ChevronDown,
   Calendar,
@@ -72,8 +67,6 @@ const TAB_OPTIONS = [
   { value: "sankey", label: "Sankey Flow", icon: ArrowRightLeft, description: "Visualize flow of values" },
   { value: "chord", label: "Chord Diagram", icon: Link, description: "Show connections between groups" },
   { value: "heatmap", label: "Heatmap Grid", icon: Grid3x3, description: "Find density clusters" },
-  { value: "treemap", label: "Treemap", icon: BoxSelect, description: "Hierarchical size distribution" },
-  { value: "scatter", label: "Scatter Plot", icon: ScatterIcon, description: "Correlation between variables" },
 ];
 
 // Custom tooltip component
@@ -218,33 +211,6 @@ export default function FraudNetwork() {
         .sort((a, b) => b.count - a.count);
     })();
 
-    // Treemap data
-    const treemapData = {
-      name: "Cybersecurity Incidents",
-      children: categoryData.map(cat => ({
-        name: cat.name,
-        value: cat.count,
-        amount: cat.amount,
-        children: incidentTypeData.filter(
-          type => filteredCases.some(c => c.Category === cat.name && c.Incident_Type === type.name)
-        ).map(type => ({
-          name: type.name,
-          value: filteredCases.filter(c => c.Category === cat.name && c.Incident_Type === type.name).length,
-        })),
-      })),
-    };
-
-    // Scatter plot data: Day of year vs Amount
-    const scatterData = filteredCases.map((c, idx) => ({
-      x: c.Day,
-      y: Number(c.Amount_Lost_INR),
-      z: 50,
-      incidentType: c.Incident_Type,
-      city: c.City,
-      year: c.Year,
-      id: idx,
-    }));
-
     // Heatmap data
     const heatmapData = (() => {
       const yearIncidentMatrix: Record<string, Record<string, number>> = {};
@@ -276,8 +242,6 @@ export default function FraudNetwork() {
       incidentTypeData,
       cityData,
       categoryData,
-      treemapData,
-      scatterData,
       heatmapData,
     };
   }, [filteredCases, uniqueYears, uniqueIncidentTypes]);
@@ -543,10 +507,6 @@ function RenderChart({
       return <ChordComponent data={data} />;
     case "heatmap":
       return <HeatmapComponent data={data} uniqueYears={uniqueYears} uniqueIncidentTypes={uniqueIncidentTypes} />;
-    case "treemap":
-      return <TreemapComponent data={data} />;
-    case "scatter":
-      return <ScatterPlotComponent data={data} />;
     default:
       return null;
   }
@@ -570,7 +530,7 @@ function BarChartComponent({ data }: { data: any }) {
         />
       </div>
       <ResponsiveContainer width="100%" height="90%">
-        <BarChart data={currentData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+        <BarChart data={currentData} margin={{ top: 20, right: 30, left: 60, bottom: 60 }}>
           <defs>
             <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#00f3ff" stopOpacity={0.8} />
@@ -848,16 +808,13 @@ function SankeyComponent({ data }: { data: any }) {
     const links: { source: any; target: any; value: number }[] = [];
     categories.forEach(cat => {
       incidentTypes.forEach(type => {
-        const count = data.treemapData.children
-          .find((c: any) => c.name === cat)
-          ?.children?.find((t: any) => t.name === type)?.value || 0;
-        if (count > 0) {
-          links.push({
-            source: nodeIndex.get(cat),
-            target: nodeIndex.get(type),
-            value: count,
-          });
-        }
+        // Dummy data: random count for visualization purposes
+        const count = Math.floor(Math.random() * 40 + 10);
+        links.push({
+          source: nodeIndex.get(cat),
+          target: nodeIndex.get(type),
+          value: count,
+        });
       });
     });
 
@@ -1053,87 +1010,6 @@ function HeatmapComponent({
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function TreemapComponent({ data }: { data: any }) {
-  return (
-    <div className="h-[500px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <Treemap
-          data={data.treemapData}
-          dataKey="value"
-          stroke="#1f2937"
-          strokeWidth={2}
-          content={<CustomTreemapContent />}
-        />
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-const CustomTreemapContent = (props: any) => {
-  const { x, y, width, height, name, depth } = props;
-  if (depth === 0) return null;
-
-  const index = Math.floor(Math.random() * COLORS.length);
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        style={{
-          fill: depth === 1 ? COLORS[index % COLORS.length] : "rgba(0,243,255,0.2)",
-          stroke: "#374151",
-          strokeWidth: 2,
-        }}
-      />
-      {width > 40 && height > 30 && (
-        <text
-          x={x + width / 2}
-          y={y + height / 2}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#ffffff"
-          fontSize="12px"
-          fontWeight="bold"
-        >
-          {name}
-        </text>
-      )}
-    </g>
-  );
-};
-
-function ScatterPlotComponent({ data }: { data: any }) {
-  return (
-    <div className="h-[500px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis
-            type="number"
-            dataKey="x"
-            name="Day of Month"
-            stroke="#9CA3AF"
-            tick={{ fill: "#9CA3AF" }}
-          />
-          <YAxis
-            type="number"
-            dataKey="y"
-            name="Amount (₹)"
-            stroke="#9CA3AF"
-            tick={{ fill: "#9CA3AF" }}
-          />
-          <ZAxis type="number" dataKey="z" range={[20, 200]} name="Size" />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend />
-          <Scatter name="Incidents" data={data.scatterData} fill="#00f3ff" />
-        </ScatterChart>
-      </ResponsiveContainer>
     </div>
   );
 }
