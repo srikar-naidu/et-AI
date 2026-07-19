@@ -138,8 +138,29 @@ export default function FraudNetwork() {
       <aside className="space-y-5">
         <div className="rounded-2xl border border-[#333] bg-[#0d0d0d] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><AlertTriangle className="size-5 text-[#ff7a00]" />Discovered campaigns</h3><div className="mt-3 space-y-3">{graphData.clusters.map((cluster, index) => <button key={cluster.id} type="button" onClick={() => { setSelectedCluster((current) => current === index ? null : index); setSelectedNode(null); setAgentReply(null); }} aria-pressed={selectedCluster === index} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedCluster === index ? "border-[#ff003c] bg-[#ff003c]/10" : "border-[#333] bg-[#111] hover:bg-[#171717]"}`}><span className="flex justify-between gap-3 font-medium text-white"><span className="truncate">Campaign {index + 1}</span><span className="rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-300">{cluster.riskLevel.toUpperCase()}</span></span><span className="mt-2 block text-xs leading-5 text-gray-400">{cluster.memberCount} linked entities · INR {cluster.totalTransferred.toLocaleString("en-IN")} · {cluster.flaggedEdgeCount} flagged links</span></button>)}</div></div>
         {activeCluster && <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><FileText className="size-5 text-[#9fedf5]" />Evidence package</h3><p className="mt-2 text-sm leading-6 text-gray-300">{activeCluster.summary}</p><button type="button" onClick={exportPackage} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#00f3ff] px-3 py-2 text-sm font-semibold text-black hover:bg-[#59f7ff]"><ShieldAlert className="size-4" />Export evidence PDF</button></div>}
-        <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><Bot className="size-5 text-[#9fedf5]" />Cluster intelligence agent</h3><p className="mt-2 text-xs leading-5 text-gray-300">Answers are grounded in the active cluster&apos;s graph facts.</p><label className="sr-only" htmlFor="cluster-question">Question for the selected cluster</label><textarea id="cluster-question" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={600} className="mt-3 min-h-24 w-full resize-y rounded-lg border border-[#293746] bg-[#06090d] p-2 text-sm text-white outline-none focus:border-[#00f3ff]" /><button type="button" onClick={askAgent} disabled={agentLoading || !question.trim()} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#3b5366] px-3 py-2 text-sm font-medium text-[#9fedf5] hover:bg-[#0e2731] disabled:cursor-not-allowed disabled:opacity-50"><Send className="size-4" />{agentLoading ? "Analysing…" : "Ask agent"}</button>{agentReply && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-[#111923] p-3 text-sm leading-6 text-gray-100" role="status">{agentReply}</p>}</div>
       </aside>
     </div>
+    <section className="rounded-2xl border border-[#333] bg-[#0d0d0d] p-4" aria-labelledby="cluster-agent-title">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 id="cluster-agent-title" className="flex items-center gap-2 text-lg font-semibold text-white"><Bot className="size-5 text-[#00f3ff]" />Cluster Intelligence Agent</h3>
+          <p className="mt-1 text-sm text-gray-400">Ask about the selected campaign. Responses are grounded in its verified entities and relationships.</p>
+        </div>
+        {activeCluster && <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-200">Active: {activeCluster.id}</span>}
+      </div>
+      <div className="grid min-h-64 gap-4 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]">
+        <div className="flex min-w-0 flex-col rounded-xl border border-[#333] bg-[#111] p-3">
+          <label className="text-sm font-medium text-gray-200" htmlFor="cluster-question">Investigator question</label>
+          <textarea id="cluster-question" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={600} className="mt-2 min-h-28 flex-1 resize-y rounded-lg border border-[#333] bg-[#050505] p-3 text-sm leading-6 text-white outline-none focus:border-[#00f3ff]" />
+          <button type="button" onClick={askAgent} disabled={agentLoading || !question.trim()} className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"><Send className="size-4" />{agentLoading ? "Analysing cluster…" : "Ask intelligence agent"}</button>
+        </div>
+        <div className="min-w-0 rounded-xl border border-[#333] bg-[#050505] p-3">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Evidence-grounded response</p>
+          <div className="h-52 overflow-y-auto pr-2 text-sm leading-6 text-gray-100" role="status">
+            {agentReply ? <p className="whitespace-pre-wrap">{agentReply}</p> : <p className="text-gray-500">Your intelligence response will appear here. This area scrolls independently for long analyses.</p>}
+          </div>
+        </div>
+      </div>
+    </section>
   </section>;
 }
