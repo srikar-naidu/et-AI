@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import Papa from "papaparse";
 
 const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
 const secret = process.env.SUPABASE_SECRET_KEY;
@@ -9,9 +10,9 @@ if (!baseUrl || !secret) {
 }
 
 function parseCsv(text) {
-  const [header, ...rows] = text.trim().split(/\r?\n/);
-  const keys = header.split(",");
-  return rows.filter(Boolean).map((row) => Object.fromEntries(row.split(",").map((value, index) => [keys[index], value])));
+  const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+  if (parsed.errors.length) throw new Error(`CSV parsing failed: ${parsed.errors[0].message}`);
+  return parsed.data;
 }
 
 async function readCsv(name) {
@@ -29,7 +30,31 @@ async function insert(table, rows, onConflict) {
 }
 
 const [accounts, transactions, alerts] = await Promise.all([readCsv("accounts.csv"), readCsv("tx.csv"), readCsv("alerts.csv")]);
-const flagged = new Set(alerts.map((alert) => alert.ACCOUNT_ID));
+const flagged = new Set(alerts.map((alert) => String(alert.ACCOUNT_ID)));
+const accountId = (account) => String(account.ACCOUNT_ID);
+const highRiskAccounts = accounts.filter((account) => flagged.has(accountId(account)) || account.isFraud === "true");
+const enrichmentEntities = [];
+const enrichmentEdges = [];
+
+for (const account of highRiskAccounts) {
+  const id = accountId(account);
+  // Deterministic synthetic identifiers create repeatable multi-source links when AMLSim lacks telemetry fields.
+  const cohort = Number(id.replace(/\D/g, "")) % 3;
+  const deviceId = `amlsim:device:cohort-${cohort}`;
+  const phoneId = `amlsim:phone:cohort-${cohort}`;
+  const jurisdiction = String(account.country || "IN").toUpperCase();
+  const jurisdictionId = `amlsim:jurisdiction:${jurisdiction}`;
+  enrichmentEntities.push(
+    { external_id: deviceId, entity_type: "device", label: `Device fingerprint cohort ${cohort}`, risk_score: 78, attributes: { synthetic: true, source: "AMLSim enrichment" } },
+    { external_id: phoneId, entity_type: "phone", label: `Phone signal cohort ${cohort}`, risk_score: 72, attributes: { synthetic: true, source: "AMLSim enrichment" } },
+    { external_id: jurisdictionId, entity_type: "location", label: `Jurisdiction: ${jurisdiction}`, risk_score: 20, attributes: { country: jurisdiction } },
+  );
+  enrichmentEdges.push(
+    { source_external_id: `amlsim:account:${id}`, target_external_id: deviceId, relationship_type: "logged_in_with_device", amount: null, occurred_at: "2017-01-01T00:00:00.000Z", is_flagged: true, attributes: { synthetic: true } },
+    { source_external_id: `amlsim:account:${id}`, target_external_id: phoneId, relationship_type: "called_phone", amount: null, occurred_at: "2017-01-01T00:00:00.000Z", is_flagged: true, attributes: { synthetic: true } },
+    { source_external_id: `amlsim:account:${id}`, target_external_id: jurisdictionId, relationship_type: "registered_in", amount: null, occurred_at: "2017-01-01T00:00:00.000Z", is_flagged: false, attributes: { synthetic: true } },
+  );
+}
 
 await insert("graph_entities", accounts.map((account) => ({
   external_id: `amlsim:account:${account.ACCOUNT_ID}`,
@@ -49,4 +74,7 @@ await insert("graph_edges", transactions.map((transaction) => ({
   attributes: { transaction_id: transaction.TXN_ID, count: Number(transaction.tx_count) },
 })), "source_external_id,target_external_id,relationship_type,occurred_at");
 
-console.log(`Imported ${accounts.length} accounts, ${transactions.length} transactions, and ${alerts.length} alert records.`);
+await insert("graph_entities", [...new Map(enrichmentEntities.map((entity) => [entity.external_id, entity])).values()], "external_id");
+await insert("graph_edges", enrichmentEdges, "source_external_id,target_external_id,relationship_type");
+
+console.log(`Imported ${accounts.length} accounts, ${transactions.length} transactions, ${alerts.length} alert records, and ${enrichmentEntities.length} enriched telemetry entities.`);

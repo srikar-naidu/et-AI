@@ -51,7 +51,7 @@ on conflict (id) do nothing;
 create table if not exists public.graph_entities (
   id uuid primary key default gen_random_uuid(),
   external_id text not null unique,
-  entity_type text not null check (entity_type in ('account', 'individual', 'organization', 'phone', 'url', 'device')),
+  entity_type text not null check (entity_type in ('account', 'individual', 'organization', 'phone', 'url', 'device', 'location')),
   label text not null,
   risk_score numeric(5,2) not null default 0 check (risk_score between 0 and 100),
   attributes jsonb not null default '{}'::jsonb,
@@ -76,6 +76,7 @@ create index if not exists audit_events_case_id_idx on public.audit_events (case
 create index if not exists evidence_items_case_id_idx on public.evidence_items (case_id, created_at desc);
 create index if not exists graph_edges_source_idx on public.graph_edges (source_external_id);
 create index if not exists graph_edges_target_idx on public.graph_edges (target_external_id);
+create unique index if not exists graph_edges_dedup_idx on public.graph_edges (source_external_id, target_external_id, relationship_type, occurred_at);
 
 alter table public.cases enable row level security;
 alter table public.complaints enable row level security;

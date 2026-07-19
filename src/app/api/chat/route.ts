@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
 import { getGroqApiKey } from "@/lib/server-env";
+import { getClusterGraph } from "@/lib/fraud-intelligence";
+import { loadFraudGraph } from "@/lib/fraud-data";
 
 const SYSTEM_PROMPT_TEMPLATE = `You are the Citizen Fraud Shield Assistant, an official conversational AI for the Digital Public Safety Command Center. 
 Your job is to assist citizens who suspect they are being targeted by a scam, specifically digital arrests, phishing, or financial fraud.
@@ -15,7 +17,12 @@ Rules:
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, language } = await request.json();
+    const { messages, language, clusterId } = await request.json();
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 30) {
+      return NextResponse.json({ error: "Provide between 1 and 30 chat messages." }, { status: 400 });
+    }
+
+    const graphContext = typeof clusterId === "string" ? getClusterGraph(await loadFraudGraph(), clusterId) : null;
 
     const apiKey = getGroqApiKey();
     if (!apiKey) {
@@ -39,7 +46,12 @@ export async function POST(request: NextRequest) {
       as: "Assamese"
     };
 
-    const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace("{{LANGUAGE}}", LANGUAGE_NAMES[language] || "English");
+    const clusterPrompt = graphContext
+      ? `\n\nYou are additionally assisting an investigator with the selected fraud cluster. Use only these verified facts. Do not invent names, transactions, or legal conclusions. Say when the data is insufficient.\nCluster: ${graphContext.cluster.id}\n${graphContext.cluster.summary}\nEntities: ${graphContext.nodes.map((node) => `${node.label} (${node.type}, risk ${node.riskScore})`).join("; ")}\nRelationships: ${graphContext.links.map((link) => `${link.source} -> ${link.target}: ${link.type}${link.amount ? ` INR ${link.amount}` : ""}${link.flagged ? " [flagged]" : ""}`).join("; ")}`
+      : "";
+    const systemPrompt = graphContext
+      ? `You are the Fraud Network Intelligence Agent for an authorised investigator. Produce a concise, formal forensic narrative in ${LANGUAGE_NAMES[language] || "English"}. Explain linkages, transactions, and risk signals from the verified cluster facts only. Do not claim guilt, make legal conclusions, or invent evidence.${clusterPrompt}`
+      : SYSTEM_PROMPT_TEMPLATE.replace("{{LANGUAGE}}", LANGUAGE_NAMES[language] || "English");
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [

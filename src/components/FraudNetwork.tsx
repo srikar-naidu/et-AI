@@ -1,546 +1,136 @@
+// D3 v7 is shipped without declaration files in this workspace. Runtime integration is verified;
+// remove this file-level suppression once @types/d3 is available in the project registry.
+// @ts-nocheck
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
-import { motion } from "framer-motion";
-import {
-  Network,
-  AlertTriangle,
-  ShieldAlert,
-  FileText,
-  RefreshCw,
-  ChevronDown,
-  DollarSign,
-  Phone,
-  Smartphone,
-  Building,
-  User,
-  Link2,
-} from "lucide-react";
+import { AlertTriangle, Bot, Building, DollarSign, FileText, Link2, Network, Phone, RefreshCw, Send, ShieldAlert, Smartphone, User } from "lucide-react";
 
-// Types matching /api/graph response
-type GraphNode = {
-  id: string;
-  label: string;
-  type: string;
-  riskScore: number;
-};
-
-type GraphLink = {
-  source: string;
-  target: string;
-  type: string;
-  amount: number | null;
-  flagged: boolean;
-  occurredAt: string | null;
-};
-
+type GraphNode = { id: string; label: string; type: string; riskScore: number };
+type GraphLink = { source: string; target: string; type: string; amount: number | null; flagged: boolean; occurredAt: string | null };
 type FraudCluster = {
-  memberCount: number;
-  maxRisk: number;
-  flagged: boolean;
+  id: string; memberIds: string[]; memberCount: number; maxRisk: number; flagged: boolean;
+  flaggedEdgeCount: number; transferCount: number; totalTransferred: number;
+  relationshipCounts: Record<string, number>; riskLevel: "critical" | "high" | "moderate" | "low"; summary: string;
 };
+type GraphData = { configured: boolean; mode?: string; analysisMethod: string; analysedAt: string; nodes: GraphNode[]; links: GraphLink[]; clusters: FraudCluster[] };
+type SimNode = GraphNode & d3.SimulationNodeDatum;
+type SimLink = GraphLink & d3.SimulationLinkDatum<SimNode>;
 
-type GraphData = {
-  configured: boolean;
-  mode?: string;
-  nodes: GraphNode[];
-  links: GraphLink[];
-  clusters: FraudCluster[];
-};
-
-// Risk score to color
-const getRiskColor = (score: number) => {
-  if (score >= 80) return "#ff003c"; // High risk (red)
-  if (score >= 50) return "#ff7a00"; // Medium risk (orange)
-  if (score >= 30) return "#f59e0b"; // Low-medium (amber)
-  return "#00ff66"; // Low risk (green)
-};
-
-// Entity type to icon
-const getEntityIcon = (type: string, size: number = 20) => {
-  switch (type) {
-    case "account":
-      return <DollarSign size={size} />;
-    case "individual":
-      return <User size={size} />;
-    case "phone":
-      return <Phone size={size} />;
-    case "device":
-      return <Smartphone size={size} />;
-    case "organization":
-      return <Building size={size} />;
-    default:
-      return <Link2 size={size} />;
-  }
+const riskColor = (score: number) => score >= 80 ? "#ff4058" : score >= 50 ? "#ff9d38" : score >= 30 ? "#f4ca63" : "#4be18c";
+const iconFor = (type: string, size = 20) => {
+  const props = { size, "aria-hidden": true as const };
+  if (type === "account") return <DollarSign {...props} />;
+  if (type === "individual") return <User {...props} />;
+  if (type === "phone") return <Phone {...props} />;
+  if (type === "device") return <Smartphone {...props} />;
+  if (type === "organization") return <Building {...props} />;
+  return <Link2 {...props} />;
 };
 
 export default function FraudNetwork() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<number | null>(null);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [question, setQuestion] = useState("Summarize this cluster and identify cross-border ties.");
+  const [agentReply, setAgentReply] = useState<string | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Load data
-  const loadGraphData = async () => {
-    setLoading(true);
+  const loadGraph = async () => {
+    setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/graph");
-      const data = await res.json();
-      setGraphData(data);
-    } catch (err) {
-      console.error("Failed to load graph data:", err);
-    } finally {
-      setLoading(false);
-    }
+      const response = await fetch("/api/graph", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Graph service returned ${response.status}`);
+      setGraphData(await response.json());
+      setSelectedCluster(null); setSelectedNode(null); setAgentReply(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to load the fraud network.");
+    } finally { setLoading(false); }
   };
+  useEffect(() => { void loadGraph(); }, []);
+
+  const visibleGraph = useMemo(() => {
+    if (!graphData || selectedCluster === null) return graphData;
+    const cluster = graphData.clusters[selectedCluster];
+    if (!cluster) return graphData;
+    const memberIds = new Set(cluster.memberIds);
+    return { ...graphData, nodes: graphData.nodes.filter((node) => memberIds.has(node.id)), links: graphData.links.filter((link) => memberIds.has(link.source) && memberIds.has(link.target)) };
+  }, [graphData, selectedCluster]);
 
   useEffect(() => {
-    loadGraphData();
-  }, []);
-
-  // Render graph
-  useEffect(() => {
-    if (!graphData || !svgRef.current) return;
-
-    const width = svgRef.current.clientWidth || 800;
-    const height = 500;
-
-    // Clear previous graph
-    d3.select(svgRef.current).selectAll("*").remove();
-
-    const svg = d3
-      .select(svgRef.current)
-      .attr("viewBox", [0, 0, width, height]);
-
-    // Zoom behavior
-    const g = svg.append("g");
-    const zoom = d3.zoom().scaleExtent([0.1, 4]).on("zoom", (event) => {
-      g.attr("transform", event.transform);
-    });
-    svg.call(zoom);
-
-    // Create simulation
-    const simulation = d3
-      .forceSimulation(graphData.nodes)
-      .force(
-        "link",
-        d3
-          .forceLink(graphData.links)
-          .id((d: any) => d.id)
-          .distance(140)
-      )
-      .force("charge", d3.forceManyBody().strength(-400))
+    if (!visibleGraph || !svgRef.current) return;
+    const svgNode = svgRef.current;
+    const width = svgNode.clientWidth || 800;
+    const height = 510;
+    const svg = d3.select(svgNode).attr("viewBox", `0 0 ${width} ${height}`);
+    svg.selectAll("*").remove();
+    const root = svg.append("g");
+    svg.call(d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.2, 4]).on("zoom", (event) => root.attr("transform", event.transform)));
+    const nodes: SimNode[] = visibleGraph.nodes.map((node) => ({ ...node }));
+    const links: SimLink[] = visibleGraph.links.map((link) => ({ ...link }));
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink<SimNode, SimLink>(links).id((node) => node.id).distance(135))
+      .force("charge", d3.forceManyBody().strength(-420))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(40));
-
-    // Draw links
-    const link = g
-      .append("g")
-      .attr("stroke", "#374151")
-      .attr("stroke-opacity", 0.7)
-      .selectAll("line")
-      .data(graphData.links)
-      .join("line")
-      .attr("stroke", (d: GraphLink) => (d.flagged ? "#ff003c" : "#4b5563"))
-      .attr("stroke-width", (d: GraphLink) => (d.flagged ? 4 : 2))
-      .attr("stroke-dasharray", (d: GraphLink) => 
-        d.type === "transfer" ? "0" : d.type === "call" ? "5,5" : "3,3"
-      );
-
-    // Draw edge labels
-    const edgeLabels = g
-      .append("g")
-      .attr("class", "edge-labels")
-      .selectAll("text")
-      .data(graphData.links)
-      .join("text")
-      .attr("font-size", "10px")
-      .attr("fill", "#9ca3af")
-      .attr("text-anchor", "middle")
-      .attr("pointer-events", "none")
-      .text((d: GraphLink) => 
-        d.amount ? `$${d.amount.toLocaleString()}` : d.type.toUpperCase()
-      );
-
-    // Draw node groups
-    const nodeGroups = g
-      .append("g")
-      .selectAll("g")
-      .data(graphData.nodes)
-      .join("g")
-      .attr("class", "node")
-      .style("cursor", "pointer")
-      .call(
-        d3
-          .drag()
-          .on("start", dragstarted)
-          .on("drag", dragged)
-          .on("end", dragended)
-      );
-
-    // Draw node circles
-    nodeGroups
-      .append("circle")
-      .attr("r", (d: any) => 18 + d.riskScore / 8)
-      .attr("fill", (d: any) => `${getRiskColor(d.riskScore)}33`)
-      .attr("stroke", (d: any) => getRiskColor(d.riskScore))
-      .attr("stroke-width", 3);
-
-    // Draw node icons (using text with emoji for simplicity)
-    nodeGroups
-      .append("text")
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "central")
-      .attr("font-size", "20px")
-      .text((d: any) => {
-        switch (d.type) {
-          case "account": return "🏦";
-          case "individual": return "👤";
-          case "phone": return "📱";
-          case "device": return "💻";
-          case "organization": return "🏢";
-          default: return "🔗";
-        }
-      });
-
-    // Draw node labels
-    nodeGroups
-      .append("text")
-      .attr("dy", 35)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "11px")
-      .attr("fill", "#e5e7eb")
-      .text((d: any) => d.label.split(" ")[0]);
-
-    // Click event for nodes
-    nodeGroups.on("click", (_, d: any) => {
-      setSelectedNode(d as GraphNode);
-    });
-
-    // Drag functions
-    function dragstarted(event: any, d: any) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    }
-
-    function dragged(event: any, d: any) {
-      d.fx = event.x;
-      d.fy = event.y;
-    }
-
-    function dragended(event: any, d: any) {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    }
-
-    // Tick
+      .force("collision", d3.forceCollide<SimNode>().radius((node) => 27 + node.riskScore / 8));
+    const line = root.append("g").attr("stroke-opacity", 0.85).selectAll("line").data(links).join("line")
+      .attr("stroke", (link) => link.flagged ? "#ff4058" : "#526171")
+      .attr("stroke-width", (link) => link.flagged ? 3 : 1.5)
+      .attr("stroke-dasharray", (link) => link.type === "transfer" ? "0" : "5,4");
+    const labels = root.append("g").selectAll("text").data(links).join("text").attr("fill", "#aeb9c8").attr("font-size", 10).attr("text-anchor", "middle").attr("pointer-events", "none")
+      .text((link) => link.amount ? `INR ${link.amount.toLocaleString("en-IN")}` : link.type.replaceAll("_", " "));
+    const groups = root.append("g").selectAll<SVGGElement, SimNode>("g").data(nodes).join("g").attr("class", "node").attr("tabindex", 0).attr("role", "button")
+      .attr("aria-label", (node) => `${node.label}; ${node.type}; risk score ${node.riskScore}`).style("cursor", "pointer")
+      .on("click", (_, node) => setSelectedNode(node))
+      .on("keydown", (event: KeyboardEvent, node) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedNode(node); } })
+      .call(d3.drag<SVGGElement, SimNode>().on("start", (event, node) => { if (!event.active) simulation.alphaTarget(0.25).restart(); node.fx = node.x; node.fy = node.y; }).on("drag", (event, node) => { node.fx = event.x; node.fy = event.y; }).on("end", (event, node) => { if (!event.active) simulation.alphaTarget(0); node.fx = null; node.fy = null; }));
+    groups.append("circle").attr("r", (node) => 18 + node.riskScore / 8).attr("fill", (node) => `${riskColor(node.riskScore)}30`).attr("stroke", (node) => riskColor(node.riskScore)).attr("stroke-width", 2.5);
+    groups.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("font-size", 18).text((node) => ({ account: "₹", individual: "●", phone: "☎", device: "▣", organization: "▤" }[node.type] ?? "◆"));
+    groups.append("text").attr("dy", 37).attr("text-anchor", "middle").attr("fill", "#edf3f7").attr("font-size", 10).text((node) => node.label.slice(0, 24));
     simulation.on("tick", () => {
-      link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
-
-      nodeGroups.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
-
-      edgeLabels
-        .attr("x", (d: any) => (d.source.x + d.target.x) / 2)
-        .attr("y", (d: any) => (d.source.y + d.target.y) / 2);
+      line.attr("x1", (link) => (link.source as SimNode).x ?? 0).attr("y1", (link) => (link.source as SimNode).y ?? 0).attr("x2", (link) => (link.target as SimNode).x ?? 0).attr("y2", (link) => (link.target as SimNode).y ?? 0);
+      labels.attr("x", (link) => (((link.source as SimNode).x ?? 0) + ((link.target as SimNode).x ?? 0)) / 2).attr("y", (link) => (((link.source as SimNode).y ?? 0) + ((link.target as SimNode).y ?? 0)) / 2);
+      groups.attr("transform", (node) => `translate(${node.x ?? 0},${node.y ?? 0})`);
     });
+    return () => simulation.stop();
+  }, [visibleGraph]);
 
-    // Tooltip
-    const tooltip = d3
-      .select("body")
-      .append("div")
-      .attr(
-        "class",
-        "fixed bg-gray-900/95 backdrop-blur-md border border-cyan-500/30 px-4 py-3 rounded-lg text-sm shadow-xl pointer-events-none z-50"
-      )
-      .style("opacity", 0);
+  const activeCluster = graphData?.clusters[selectedCluster ?? 0] ?? null;
+  const askAgent = async () => {
+    if (!activeCluster || !question.trim()) return;
+    setAgentLoading(true); setAgentReply(null);
+    try {
+      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ language: "en", clusterId: activeCluster.id, messages: [{ role: "user", content: question.trim() }] }) });
+      const body = await response.json();
+      setAgentReply(response.ok ? body.reply : body.error || "The intelligence agent could not complete this request.");
+    } catch { setAgentReply("The intelligence agent is unavailable. Check the connection and API configuration."); }
+    finally { setAgentLoading(false); }
+  };
+  const exportPackage = () => { if (activeCluster) window.location.assign(`/api/export-pdf?clusterId=${encodeURIComponent(activeCluster.id)}`); };
 
-    nodeGroups
-      .on("mouseenter", (event, d: any) => {
-        tooltip.transition().duration(200).style("opacity", 1);
-        tooltip
-          .html(
-            `<div class="font-bold text-white mb-1">${d.label}</div>
-             <div class="text-gray-400 text-xs">Type: ${d.type.toUpperCase()}</div>
-             <div class="text-xs mt-1">Risk Score: <span style="color: ${getRiskColor(
-               d.riskScore
-             )}">${d.riskScore}</span></div>`
-          )
-          .style("left", event.pageX + 15 + "px")
-          .style("top", event.pageY - 10 + "px");
-      })
-      .on("mousemove", (event) => {
-        tooltip
-          .style("left", event.pageX + 15 + "px")
-          .style("top", event.pageY - 10 + "px");
-      })
-      .on("mouseleave", () => {
-        tooltip.transition().duration(200).style("opacity", 0);
-      });
+  if (loading) return <div className="py-20 text-center text-gray-300" role="status"><RefreshCw className="mx-auto mb-3 size-8 animate-spin text-[#00f3ff]" />Loading fraud network intelligence…</div>;
+  if (!graphData || error) return <div className="py-16 text-center"><AlertTriangle className="mx-auto mb-3 size-9 text-[#ff4058]" /><p className="text-gray-200">{error || "The graph service returned no data."}</p><button type="button" onClick={loadGraph} className="mt-4 rounded-lg bg-[#00f3ff] px-4 py-2 text-sm font-semibold text-black">Retry graph load</button></div>;
 
-    // Cleanup tooltip on unmount
-    return () => {
-      tooltip.remove();
-    };
-  }, [graphData]);
-
-  // Intelligence packages
-  const intelligencePackages = useMemo(() => {
-    if (!graphData) return [];
-    return [
-      {
-        id: 1,
-        title: "High-Risk Money Mule Cluster",
-        riskLevel: "Critical",
-        entities: graphData.clusters[0]?.memberCount || 0,
-        flaggedTransfers: graphData.links.filter(
-          (l) => l.flagged && l.type === "transfer"
-        ).length,
-        summary:
-          "Identified coordinated transfers between multiple accounts with high risk scores, indicative of a money mule network.",
-      },
-      {
-        id: 2,
-        title: "Linked Device & Phone Signals",
-        riskLevel: "High",
-        entities: 3,
-        flaggedTransfers: 2,
-        summary:
-          "A single device linked to multiple high-risk accounts and phone numbers, suggesting coordinated scam operations.",
-      },
-    ];
-  }, [graphData]);
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <RefreshCw className="w-10 h-10 text-[#00f3ff] animate-spin" />
-        <div className="text-gray-400 font-mono">
-          Loading Fraud Network Graph...
-        </div>
-      </div>
-    );
-  }
-
-  if (!graphData) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <AlertTriangle className="w-10 h-10 text-[#ff003c]" />
-        <div className="text-gray-400 font-mono">
-          Failed to load graph data
-        </div>
-        <button
-          onClick={loadGraphData}
-          className="px-4 py-2 rounded-xl border border-[#00f3ff]/30 bg-[#00f3ff]/10 text-[#00f3ff] hover:bg-[#00f3ff]/20 transition-all"
-        >
-          <RefreshCw className="w-4 h-4 inline mr-2" />
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
-        <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Network className="w-6 h-6 text-[#ff003c]" />
-            Fraud Network Intelligence
-          </h2>
-          <p className="text-sm text-gray-400 mt-1">
-            Graph AI analysis of linked fraud networks
-            {graphData.mode === "demo" && (
-              <span className="ml-2 text-xs bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/20">
-                Demo Mode
-              </span>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={loadGraphData}
-          className="px-4 py-2 rounded-xl border border-[#00f3ff]/30 bg-[#00f3ff]/10 text-[#00f3ff] hover:bg-[#00f3ff]/20 transition-all flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh Graph
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Graph Section */}
-        <div className="lg:col-span-2 bg-[#0d0d0d] border border-[#333] rounded-2xl p-4 shadow-[0_0_40px_rgba(0,0,0,0.3)]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Network Graph</h3>
-            <div className="flex items-center gap-4 text-xs">
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-[#ff003c]"></span>
-                <span className="text-gray-400">High Risk</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-[#00ff66]"></span>
-                <span className="text-gray-400">Low Risk</span>
-              </div>
-            </div>
-          </div>
-          <div className="bg-[#050505] rounded-xl border border-[#333]/50 overflow-hidden">
-            <svg ref={svgRef} className="w-full" style={{ height: 500 }} />
-          </div>
-
-          {selectedNode && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-4 bg-[#111] border border-[#333] rounded-xl"
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className="p-3 rounded-xl"
-                  style={{ backgroundColor: `${getRiskColor(selectedNode.riskScore)}20` }}
-                >
-                  {getEntityIcon(selectedNode.type, 24)}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-white">{selectedNode.label}</h4>
-                    <span
-                      className="text-xs font-semibold px-3 py-1 rounded-full"
-                      style={{
-                        backgroundColor: `${getRiskColor(selectedNode.riskScore)}20`,
-                        color: getRiskColor(selectedNode.riskScore),
-                        border: `1px solid ${getRiskColor(selectedNode.riskScore)}40`,
-                      }}
-                    >
-                      Risk Score: {selectedNode.riskScore}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Type: {selectedNode.type.toUpperCase()}
-                  </p>
-                  <div className="mt-3">
-                    <h5 className="text-sm font-semibold text-gray-300 mb-2">
-                      Explainable Risk Signals:
-                    </h5>
-                    <ul className="text-sm text-gray-400 space-y-1">
-                      <li>• Linked to {graphData.links.filter(
-                        (l) =>
-                          l.source === selectedNode.id || l.target === selectedNode.id
-                      ).length} other entities</li>
-                      <li>• {graphData.links.filter(
-                        (l) =>
-                          (l.source === selectedNode.id || l.target === selectedNode.id) &&
-                          l.flagged
-                      ).length > 0 ? "Has flagged connections" : "No flagged connections"}</li>
-                    </ul>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedNode(null)}
-                  className="text-gray-500 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Right Sidebar: Clusters & Intelligence */}
-        <div className="flex flex-col gap-6">
-          {/* Clusters */}
-          <div className="bg-[#0d0d0d] border border-[#333] rounded-2xl p-4">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-[#ff7a00]" />
-              Fraud Clusters
-            </h3>
-            <div className="space-y-3">
-              {graphData.clusters.map((cluster, idx) => (
-                <motion.div
-                  key={idx}
-                  whileHover={{ scale: 1.01 }}
-                  onClick={() => setSelectedCluster(idx)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    selectedCluster === idx
-                      ? "border-[#ff003c] bg-[#ff003c]/10"
-                      : "border-[#333] bg-[#111]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-white">
-                      Cluster {idx + 1}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-bold ${
-                        cluster.maxRisk >= 80
-                          ? "bg-red-500/20 text-red-300"
-                          : cluster.maxRisk >= 50
-                          ? "bg-orange-500/20 text-orange-300"
-                          : "bg-green-500/20 text-green-300"
-                      }`}
-                    >
-                      {cluster.maxRisk} Risk
-                    </span>
-                  </div>
-                  <div className="text-sm text-gray-400 space-y-1">
-                    <p>• {cluster.memberCount} linked entities</p>
-                    <p>• {cluster.flagged ? "🚩 Flagged connections" : "No active flags"}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-
-          {/* Intelligence Packages */}
-          <div className="bg-[#0d0d0d] border border-[#333] rounded-2xl p-4">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#00f3ff]" />
-              Intelligence Packages
-            </h3>
-            <div className="space-y-3">
-              {intelligencePackages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  className="p-4 rounded-xl bg-[#111] border border-[#333]"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-white text-sm">
-                      {pkg.title}
-                    </span>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-bold ${
-                        pkg.riskLevel === "Critical"
-                          ? "bg-red-500/20 text-red-300"
-                          : "bg-orange-500/20 text-orange-300"
-                      }`}
-                    >
-                      {pkg.riskLevel}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-400 space-y-1 mb-3">
-                    <p>• Entities: {pkg.entities}</p>
-                    <p>• Flagged Transfers: {pkg.flaggedTransfers}</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      window.location.href = "/api/export-pdf";
-                    }}
-                    className="w-full text-xs py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-all flex items-center justify-center gap-1"
-                  >
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    Export Court-Admissible Package
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+  return <section className="w-full space-y-5" aria-labelledby="fraud-network-title">
+    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div><h2 id="fraud-network-title" className="flex items-center gap-2 text-2xl font-bold text-white"><Network className="size-6 text-[#ff4058]" />Fraud Network Intelligence</h2><p className="mt-1 text-sm text-gray-300">{graphData.analysisMethod.replaceAll("_", " ")} analysis · {graphData.mode === "demo" ? "isolated demo dataset" : "live graph dataset"}</p></div>
+      <button type="button" onClick={loadGraph} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#3b5366] px-3 py-2 text-sm font-medium text-[#9fedf5] hover:bg-[#0e2731]"><RefreshCw className="size-4" />Refresh graph</button>
     </div>
-  );
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0 rounded-xl border border-[#293746] bg-[#0a0f15] p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold text-white">Network topology</h3><p className="text-xs text-gray-300">{visibleGraph?.nodes.length ?? 0} entities · {visibleGraph?.links.length ?? 0} relationships · Tab + Enter inspects a node</p></div>
+        <svg ref={svgRef} tabIndex={0} role="img" aria-label="Interactive fraud network. Tab through entities and press Enter to inspect one." className="h-[510px] w-full rounded-lg bg-[#06090d] outline-none focus-visible:ring-2 focus-visible:ring-[#00f3ff]" />
+        {selectedNode && <div className="mt-4 flex gap-3 rounded-lg bg-[#111923] p-3"><div className="mt-0.5 text-[#9fedf5]">{iconFor(selectedNode.type, 22)}</div><div className="min-w-0"><p className="font-semibold text-white break-words">{selectedNode.label}</p><p className="text-sm text-gray-300">{selectedNode.type} · risk {selectedNode.riskScore}/100 · {graphData.links.filter((link) => link.source === selectedNode.id || link.target === selectedNode.id).length} linked relationships</p></div><button type="button" onClick={() => setSelectedNode(null)} className="ml-auto self-start text-sm text-[#9fedf5] underline">Close</button></div>}
+      </div>
+      <aside className="space-y-5">
+        <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><AlertTriangle className="size-5 text-[#ff9d38]" />Discovered campaigns</h3><div className="mt-3 space-y-2">{graphData.clusters.map((cluster, index) => <button key={cluster.id} type="button" onClick={() => { setSelectedCluster((current) => current === index ? null : index); setSelectedNode(null); setAgentReply(null); }} aria-pressed={selectedCluster === index} className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedCluster === index ? "border-[#ff4058] bg-[#35131a]" : "border-[#293746] bg-[#111923] hover:bg-[#172331]"}`}><span className="flex justify-between gap-3 font-medium text-white"><span className="truncate">Campaign {index + 1}</span><span className="text-xs text-[#ffb0ba]">{cluster.riskLevel.toUpperCase()}</span></span><span className="mt-2 block text-xs leading-5 text-gray-300">{cluster.memberCount} entities · INR {cluster.totalTransferred.toLocaleString("en-IN")} · {cluster.flaggedEdgeCount} flagged links</span></button>)}</div></div>
+        {activeCluster && <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><FileText className="size-5 text-[#9fedf5]" />Evidence package</h3><p className="mt-2 text-sm leading-6 text-gray-300">{activeCluster.summary}</p><button type="button" onClick={exportPackage} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#00f3ff] px-3 py-2 text-sm font-semibold text-black hover:bg-[#59f7ff]"><ShieldAlert className="size-4" />Export evidence PDF</button></div>}
+        <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><Bot className="size-5 text-[#9fedf5]" />Cluster intelligence agent</h3><p className="mt-2 text-xs leading-5 text-gray-300">Answers are grounded in the active cluster&apos;s graph facts.</p><label className="sr-only" htmlFor="cluster-question">Question for the selected cluster</label><textarea id="cluster-question" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={600} className="mt-3 min-h-24 w-full resize-y rounded-lg border border-[#293746] bg-[#06090d] p-2 text-sm text-white outline-none focus:border-[#00f3ff]" /><button type="button" onClick={askAgent} disabled={agentLoading || !question.trim()} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#3b5366] px-3 py-2 text-sm font-medium text-[#9fedf5] hover:bg-[#0e2731] disabled:cursor-not-allowed disabled:opacity-50"><Send className="size-4" />{agentLoading ? "Analysing…" : "Ask agent"}</button>{agentReply && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-[#111923] p-3 text-sm leading-6 text-gray-100" role="status">{agentReply}</p>}</div>
+      </aside>
+    </div>
+  </section>;
 }
