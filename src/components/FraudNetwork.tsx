@@ -129,37 +129,49 @@ export default function FraudNetwork() {
         d3
           .forceLink(graphData.links)
           .id((d: any) => d.id)
-          .distance(100)
+          .distance(140)
       )
-      .force("charge", d3.forceManyBody().strength(-300))
+      .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(30));
+      .force("collision", d3.forceCollide().radius(40));
 
     // Draw links
     const link = g
       .append("g")
       .attr("stroke", "#374151")
-      .attr("stroke-opacity", 0.6)
+      .attr("stroke-opacity", 0.7)
       .selectAll("line")
       .data(graphData.links)
       .join("line")
-      .attr("stroke", (d: GraphLink) => (d.flagged ? "#ff003c" : "#374151"))
-      .attr("stroke-width", (d: GraphLink) => (d.flagged ? 3 : 1.5));
+      .attr("stroke", (d: GraphLink) => (d.flagged ? "#ff003c" : "#4b5563"))
+      .attr("stroke-width", (d: GraphLink) => (d.flagged ? 4 : 2))
+      .attr("stroke-dasharray", (d: GraphLink) => 
+        d.type === "transfer" ? "0" : d.type === "call" ? "5,5" : "3,3"
+      );
 
-    // Draw nodes
-    const node = g
+    // Draw edge labels
+    const edgeLabels = g
       .append("g")
-      .attr("stroke", "#fff")
-      .attr("stroke-width", 1.5)
-      .selectAll("circle")
+      .attr("class", "edge-labels")
+      .selectAll("text")
+      .data(graphData.links)
+      .join("text")
+      .attr("font-size", "10px")
+      .attr("fill", "#9ca3af")
+      .attr("text-anchor", "middle")
+      .attr("pointer-events", "none")
+      .text((d: GraphLink) => 
+        d.amount ? `$${d.amount.toLocaleString()}` : d.type.toUpperCase()
+      );
+
+    // Draw node groups
+    const nodeGroups = g
+      .append("g")
+      .selectAll("g")
       .data(graphData.nodes)
-      .join("circle")
-      .attr("r", (d) => 10 + d.riskScore / 10)
-      .attr("fill", (d) => getRiskColor(d.riskScore))
+      .join("g")
+      .attr("class", "node")
       .style("cursor", "pointer")
-      .on("click", (_, d) => {
-        setSelectedNode(d as GraphNode);
-      })
       .call(
         d3
           .drag()
@@ -167,6 +179,45 @@ export default function FraudNetwork() {
           .on("drag", dragged)
           .on("end", dragended)
       );
+
+    // Draw node circles
+    nodeGroups
+      .append("circle")
+      .attr("r", (d: any) => 18 + d.riskScore / 8)
+      .attr("fill", (d: any) => `${getRiskColor(d.riskScore)}33`)
+      .attr("stroke", (d: any) => getRiskColor(d.riskScore))
+      .attr("stroke-width", 3);
+
+    // Draw node icons (using text with emoji for simplicity)
+    nodeGroups
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "central")
+      .attr("font-size", "20px")
+      .text((d: any) => {
+        switch (d.type) {
+          case "account": return "🏦";
+          case "individual": return "👤";
+          case "phone": return "📱";
+          case "device": return "💻";
+          case "organization": return "🏢";
+          default: return "🔗";
+        }
+      });
+
+    // Draw node labels
+    nodeGroups
+      .append("text")
+      .attr("dy", 35)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "11px")
+      .attr("fill", "#e5e7eb")
+      .text((d: any) => d.label.split(" ")[0]);
+
+    // Click event for nodes
+    nodeGroups.on("click", (_, d: any) => {
+      setSelectedNode(d as GraphNode);
+    });
 
     // Drag functions
     function dragstarted(event: any, d: any) {
@@ -194,7 +245,11 @@ export default function FraudNetwork() {
         .attr("x2", (d: any) => d.target.x)
         .attr("y2", (d: any) => d.target.y);
 
-      node.attr("cx", (d: any) => d.x).attr("cy", (d: any) => d.y);
+      nodeGroups.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+
+      edgeLabels
+        .attr("x", (d: any) => (d.source.x + d.target.x) / 2)
+        .attr("y", (d: any) => (d.source.y + d.target.y) / 2);
     });
 
     // Tooltip
@@ -207,14 +262,14 @@ export default function FraudNetwork() {
       )
       .style("opacity", 0);
 
-    node
+    nodeGroups
       .on("mouseenter", (event, d: any) => {
         tooltip.transition().duration(200).style("opacity", 1);
         tooltip
           .html(
             `<div class="font-bold text-white mb-1">${d.label}</div>
-             <div class="text-gray-400 text-xs">Type: ${d.type}</div>
-             <div class="text-xs">Risk Score: <span style="color: ${getRiskColor(
+             <div class="text-gray-400 text-xs">Type: ${d.type.toUpperCase()}</div>
+             <div class="text-xs mt-1">Risk Score: <span style="color: ${getRiskColor(
                d.riskScore
              )}">${d.riskScore}</span></div>`
           )
@@ -471,7 +526,12 @@ export default function FraudNetwork() {
                     <p>• Entities: {pkg.entities}</p>
                     <p>• Flagged Transfers: {pkg.flaggedTransfers}</p>
                   </div>
-                  <button className="w-full text-xs py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-all flex items-center justify-center gap-1">
+                  <button 
+                    onClick={() => {
+                      window.location.href = "/api/export-pdf";
+                    }}
+                    className="w-full text-xs py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-all flex items-center justify-center gap-1"
+                  >
                     <ShieldAlert className="w-3.5 h-3.5" />
                     Export Court-Admissible Package
                   </button>

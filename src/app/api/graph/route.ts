@@ -20,25 +20,45 @@ type EdgeRow = {
 /* ── Demo data (mirrors seed route) ─────────────────────────────── */
 
 const DEMO_ENTITIES: EntityRow[] = [
-  { external_id: "entity_001", entity_type: "account", label: "ACC-12345 (Karol Business)", risk_score: 15 },
-  { external_id: "entity_002", entity_type: "account", label: "ACC-67890 (Mumbai Traders)", risk_score: 35 },
-  { external_id: "entity_003", entity_type: "account", label: "ACC-11111 (Shell Company)", risk_score: 72 },
-  { external_id: "entity_004", entity_type: "individual", label: "Individual - Phone: 9876543210", risk_score: 58 },
-  { external_id: "entity_005", entity_type: "organization", label: "Trade House Ltd", risk_score: 42 },
-  { external_id: "entity_006", entity_type: "phone", label: "Phone: +91-8800-XXXX", risk_score: 64 },
-  { external_id: "entity_007", entity_type: "account", label: "ACC-44444 (Hawala Hub)", risk_score: 88 },
-  { external_id: "entity_008", entity_type: "device", label: "Device: Samsung A34 (IMEI masked)", risk_score: 45 },
+  // Central Mule Account (High Risk Hub)
+  { external_id: "mule_hub", entity_type: "account", label: "ACC-99999 (Mule Hub)", risk_score: 95 },
+  
+  // Victim Accounts
+  { external_id: "victim_1", entity_type: "account", label: "ACC-12345 (Victim: Rajesh)", risk_score: 10 },
+  { external_id: "victim_2", entity_type: "account", label: "ACC-67890 (Victim: Priya)", risk_score: 15 },
+  { external_id: "victim_3", entity_type: "account", label: "ACC-11111 (Victim: Amit)", risk_score: 12 },
+  { external_id: "victim_4", entity_type: "account", label: "ACC-22222 (Victim: Neha)", risk_score: 18 },
+  
+  // Scammer Entities
+  { external_id: "scammer_1", entity_type: "account", label: "ACC-44444 (Shell Company XYZ)", risk_score: 82 },
+  { external_id: "scammer_2", entity_type: "individual", label: "Individual: Unknown Scammer", risk_score: 90 },
+  
+  // Device and Phone (Common Link)
+  { external_id: "device_1", entity_type: "device", label: "Device: iPhone 15 Pro (IMEI: XXXXXXXX)", risk_score: 88 },
+  { external_id: "phone_1", entity_type: "phone", label: "Phone: +91-9999-XXXX", risk_score: 85 },
+  
+  // Offshore Account
+  { external_id: "offshore", entity_type: "account", label: "ACC-77777 (Offshore Holding)", risk_score: 92 },
 ];
 
 const DEMO_EDGES: EdgeRow[] = [
-  { source_external_id: "entity_001", target_external_id: "entity_002", relationship_type: "transfer", amount: 50000, occurred_at: new Date(Date.now() - 5 * 86400000).toISOString(), is_flagged: false },
-  { source_external_id: "entity_002", target_external_id: "entity_003", relationship_type: "transfer", amount: 100000, occurred_at: new Date(Date.now() - 3 * 86400000).toISOString(), is_flagged: true },
-  { source_external_id: "entity_003", target_external_id: "entity_004", relationship_type: "transfer", amount: 75000, occurred_at: new Date(Date.now() - 2 * 86400000).toISOString(), is_flagged: true },
-  { source_external_id: "entity_004", target_external_id: "entity_005", relationship_type: "transfer", amount: 30000, occurred_at: new Date(Date.now() - 1 * 86400000).toISOString(), is_flagged: false },
-  { source_external_id: "entity_003", target_external_id: "entity_007", relationship_type: "transfer", amount: 250000, occurred_at: new Date(Date.now() - 1.5 * 86400000).toISOString(), is_flagged: true },
-  { source_external_id: "entity_007", target_external_id: "entity_006", relationship_type: "call", amount: null, occurred_at: new Date(Date.now() - 0.5 * 86400000).toISOString(), is_flagged: true },
-  { source_external_id: "entity_006", target_external_id: "entity_008", relationship_type: "device_link", amount: null, occurred_at: new Date(Date.now() - 4 * 86400000).toISOString(), is_flagged: false },
-  { source_external_id: "entity_008", target_external_id: "entity_004", relationship_type: "ownership", amount: null, occurred_at: new Date(Date.now() - 6 * 86400000).toISOString(), is_flagged: false },
+  // Victims → Mule Hub (Transfers)
+  { source_external_id: "victim_1", target_external_id: "mule_hub", relationship_type: "transfer", amount: 25000, occurred_at: new Date(Date.now() - 2 * 86400000).toISOString(), is_flagged: true },
+  { source_external_id: "victim_2", target_external_id: "mule_hub", relationship_type: "transfer", amount: 45000, occurred_at: new Date(Date.now() - 1 * 86400000).toISOString(), is_flagged: true },
+  { source_external_id: "victim_3", target_external_id: "mule_hub", relationship_type: "transfer", amount: 30000, occurred_at: new Date(Date.now() - 0.5 * 86400000).toISOString(), is_flagged: true },
+  { source_external_id: "victim_4", target_external_id: "mule_hub", relationship_type: "transfer", amount: 50000, occurred_at: new Date(Date.now() - 1.2 * 86400000).toISOString(), is_flagged: true },
+  
+  // Mule Hub → Scammer Shell
+  { source_external_id: "mule_hub", target_external_id: "scammer_1", relationship_type: "transfer", amount: 120000, occurred_at: new Date(Date.now() - 0.8 * 86400000).toISOString(), is_flagged: true },
+  
+  // Scammer Shell → Offshore
+  { source_external_id: "scammer_1", target_external_id: "offshore", relationship_type: "transfer", amount: 100000, occurred_at: new Date(Date.now() - 0.3 * 86400000).toISOString(), is_flagged: true },
+  
+  // Common Device/Phone Links
+  { source_external_id: "scammer_1", target_external_id: "device_1", relationship_type: "logged_in", amount: null, occurred_at: new Date(Date.now() - 3 * 86400000).toISOString(), is_flagged: true },
+  { source_external_id: "scammer_2", target_external_id: "device_1", relationship_type: "logged_in", amount: null, occurred_at: new Date(Date.now() - 2.5 * 86400000).toISOString(), is_flagged: true },
+  { source_external_id: "scammer_2", target_external_id: "phone_1", relationship_type: "call", amount: null, occurred_at: new Date(Date.now() - 1.8 * 86400000).toISOString(), is_flagged: true },
+  { source_external_id: "device_1", target_external_id: "phone_1", relationship_type: "paired", amount: null, occurred_at: new Date(Date.now() - 4 * 86400000).toISOString(), is_flagged: false },
 ];
 
 /* ── Build response from entities + edges ───────────────────────── */
