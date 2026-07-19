@@ -13,6 +13,44 @@ interface AnalysisResult {
   authenticityError?: string;
 }
 
+/** Below this, a "real" verdict is treated as weak / inconclusive in the UI. */
+const STRONG_AUTH_CONFIDENCE = 0.85;
+
+function authenticityLabel(result: AnalysisResult) {
+  if (result.authenticity === "spoofed") {
+    return {
+      title: "POSSIBLE SYNTHETIC / SPOOFED VOICE",
+      tone: "danger" as const,
+      detail:
+        result.confidence !== null
+          ? `Aurigin confidence: ${(result.confidence * 100).toFixed(1)}%. Screening signal only — modern TTS and speaker→mic re-recordings can still be missed or mislabeled.`
+          : "Screening signal only — not conclusive proof.",
+    };
+  }
+
+  if (result.authenticity === "real") {
+    const weak = result.confidence !== null && result.confidence < STRONG_AUTH_CONFIDENCE;
+    if (weak) {
+      return {
+        title: "WEAK / INCONCLUSIVE — NO CLEAR SPOOF ARTIFACTS",
+        tone: "warn" as const,
+        detail: `Aurigin leaned “real” at only ${(result.confidence! * 100).toFixed(1)}% confidence. That does not prove a human spoke. High-quality AI voices (e.g. Gemini TTS) and clips recorded off a speaker often strip the digital artifacts detectors need — treat this as inconclusive and rely on the threat assessment + human review.`,
+      };
+    }
+    return {
+      title: "NO STRONG SPOOF ARTIFACTS DETECTED",
+      tone: "ok" as const,
+      detail: `Aurigin confidence: ${(result.confidence! * 100).toFixed(1)}%. Still not proof of a human voice — replayed or polished TTS can evade detectors. Cross-check the transcript threat assessment.`,
+    };
+  }
+
+  return {
+    title: "NOT AVAILABLE",
+    tone: "neutral" as const,
+    detail: result.authenticityError ?? "Voice-authenticity screening did not return a usable result.",
+  };
+}
+
 export default function DeepfakeAnalyzer() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -325,15 +363,24 @@ export default function DeepfakeAnalyzer() {
             </div>
 
             <div className="flex flex-col gap-6 flex-grow">
-              <div className={`rounded-lg border p-4 ${result.authenticity === "spoofed" ? "border-[#ff003c]/60 bg-[#ff003c]/10" : result.authenticity === "real" ? "border-[#00ff66]/50 bg-[#00ff66]/5" : "border-[#333] bg-[#111]"}`}>
-                <p className="font-mono text-xs uppercase tracking-widest text-gray-400">Screening signal (non-conclusive)</p>
-                <p className="mt-2 font-mono text-lg font-bold text-white">{result.authenticity === "spoofed" ? "POSSIBLE SYNTHETIC / SPOOFED VOICE" : result.authenticity === "real" ? "NO SPOOF SIGNAL DETECTED" : "NOT AVAILABLE"}</p>
-                <p className="mt-2 text-xs leading-5 text-gray-300">
-                  {result.confidence !== null
-                    ? `Aurigin confidence: ${(result.confidence * 100).toFixed(1)}%. This is a screening signal, not conclusive proof.`
-                    : result.authenticityError ?? "Voice-authenticity screening did not return a usable result."}
-                </p>
-              </div>
+              {(() => {
+                const auth = authenticityLabel(result);
+                const boxClass =
+                  auth.tone === "danger"
+                    ? "border-[#ff003c]/60 bg-[#ff003c]/10"
+                    : auth.tone === "warn"
+                      ? "border-[#ffb020]/60 bg-[#ffb020]/10"
+                      : auth.tone === "ok"
+                        ? "border-[#00ff66]/40 bg-[#00ff66]/5"
+                        : "border-[#333] bg-[#111]";
+                return (
+                  <div className={`rounded-lg border p-4 ${boxClass}`}>
+                    <p className="font-mono text-xs uppercase tracking-widest text-gray-400">Screening signal (non-conclusive)</p>
+                    <p className="mt-2 font-mono text-lg font-bold text-white">{auth.title}</p>
+                    <p className="mt-2 text-xs leading-5 text-gray-300">{auth.detail}</p>
+                  </div>
+                );
+              })()}
               <div>
                 <h3 className="font-mono text-xs text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <FileAudio className="w-3 h-3" /> Groq Whisper Transcript
