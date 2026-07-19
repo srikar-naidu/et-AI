@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Upload, AudioLines, FileAudio, AlertTriangle, ShieldCheck, BrainCircuit, Mic, Square } from "lucide-react";
+import { motion } from "framer-motion";
+import { Upload, AudioLines, FileAudio, AlertTriangle, BrainCircuit, Mic, Square } from "lucide-react";
+import { AudioPrepError, prepareAudioForAurigin } from "@/lib/audio-to-wav";
 
 interface AnalysisResult {
   transcript: string;
@@ -164,11 +165,22 @@ export default function DeepfakeAnalyzer() {
       if (!transcribeRes.ok) throw new Error(transcribeData.error);
       const transcript = transcribeData.text;
 
-      const authenticityForm = new FormData();
-      authenticityForm.append("file", selectedFile);
-      const authenticityPromise = fetch("/api/deepfake", { method: "POST", body: authenticityForm })
-        .then(async (response) => ({ ok: response.ok, payload: await response.json() }))
-        .catch(() => ({ ok: false, payload: { error: "Voice-authenticity screening could not be reached." } }));
+      // Aurigin rejects browser WebM; convert to mono 16 kHz WAV first (same approach as Aurigin's own docs).
+      let authenticityPromise: Promise<{ ok: boolean; payload: Record<string, unknown> }>;
+      try {
+        const wavFile = await prepareAudioForAurigin(selectedFile, selectedFile.name);
+        const authenticityForm = new FormData();
+        authenticityForm.append("file", wavFile);
+        authenticityPromise = fetch("/api/deepfake", { method: "POST", body: authenticityForm })
+          .then(async (response) => ({ ok: response.ok, payload: await response.json() }))
+          .catch(() => ({ ok: false, payload: { error: "Voice-authenticity screening could not be reached." } }));
+      } catch (prepError) {
+        const message =
+          prepError instanceof AudioPrepError
+            ? prepError.message
+            : "Could not prepare audio for authenticity screening.";
+        authenticityPromise = Promise.resolve({ ok: false, payload: { error: message, result: "unknown" } });
+      }
 
       // 3. Analyze Transcript for Social Engineering/Deepfake context via Groq LLM
       const analyzeRes = await fetch("/api/chat", {
@@ -188,13 +200,26 @@ export default function DeepfakeAnalyzer() {
       const analyzeData = await analyzeRes.json();
       if (!analyzeRes.ok) throw new Error(analyzeData.error);
       const authenticity = await authenticityPromise;
+      const authenticityResult =
+        authenticity.payload.result === "spoofed" || authenticity.payload.result === "real"
+          ? authenticity.payload.result
+          : "unknown";
+      const authenticityConfidence =
+        authenticityResult !== "unknown" && typeof authenticity.payload.confidence === "number"
+          ? authenticity.payload.confidence
+          : null;
 
       setResult({
         transcript,
         verdict: analyzeData.reply,
-        authenticity: authenticity.ok && (authenticity.payload.result === "spoofed" || authenticity.payload.result === "real") ? authenticity.payload.result : "unknown",
-        confidence: authenticity.ok && typeof authenticity.payload.confidence === "number" ? authenticity.payload.confidence : null,
-        authenticityError: authenticity.ok ? undefined : authenticity.payload.error,
+        authenticity: authenticityResult,
+        confidence: authenticityConfidence,
+        authenticityError:
+          authenticityResult === "unknown"
+            ? (typeof authenticity.payload.error === "string"
+                ? authenticity.payload.error
+                : "Voice-authenticity screening is unavailable.")
+            : undefined,
       });
 
     } catch (err: any) {
@@ -239,7 +264,7 @@ export default function DeepfakeAnalyzer() {
               <div className="text-gray-500 group-hover:text-[#00f3ff] flex flex-col items-center transition-colors">
                 <Upload className="w-12 h-12 mb-3" />
                 <p className="font-mono text-sm">Drag & Drop Audio File</p>
-                <p className="font-mono text-xs mt-1">Supports MP3, WAV</p>
+                <p className="font-mono text-xs mt-1">MP3 / WAV preferred · WebM auto-converted · min 3s</p>
               </div>
             )}
           </div>
@@ -303,7 +328,11 @@ export default function DeepfakeAnalyzer() {
               <div className={`rounded-lg border p-4 ${result.authenticity === "spoofed" ? "border-[#ff003c]/60 bg-[#ff003c]/10" : result.authenticity === "real" ? "border-[#00ff66]/50 bg-[#00ff66]/5" : "border-[#333] bg-[#111]"}`}>
                 <p className="font-mono text-xs uppercase tracking-widest text-gray-400">Screening signal (non-conclusive)</p>
                 <p className="mt-2 font-mono text-lg font-bold text-white">{result.authenticity === "spoofed" ? "POSSIBLE SYNTHETIC / SPOOFED VOICE" : result.authenticity === "real" ? "NO SPOOF SIGNAL DETECTED" : "NOT AVAILABLE"}</p>
-                <p className="mt-2 text-xs leading-5 text-gray-300">{result.confidence !== null ? `Provider confidence: ${(result.confidence * 100).toFixed(1)}%. This is a screening signal, not conclusive proof.` : result.authenticityError ?? "Run the configured voice-authenticity service to generate this signal."}</p>
+                <p className="mt-2 text-xs leading-5 text-gray-300">
+                  {result.confidence !== null
+                    ? `Aurigin confidence: ${(result.confidence * 100).toFixed(1)}%. This is a screening signal, not conclusive proof.`
+                    : result.authenticityError ?? "Voice-authenticity screening did not return a usable result."}
+                </p>
               </div>
               <div>
                 <h3 className="font-mono text-xs text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
