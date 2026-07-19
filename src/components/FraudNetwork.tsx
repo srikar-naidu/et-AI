@@ -1,24 +1,6 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import dynamic from "next/dynamic";
-import {
-  AlertTriangle,
-  Network,
-  RefreshCw,
-  ShieldCheck,
-  BarChart3,
-  PieChart,
-  TrendingUp,
-  GitBranch,
-  ArrowRightLeft,
-  Link,
-  Grid3x3,
-  BoxSelect,
-  ScatterChart as ScatterIcon,
-  Table as TableIcon,
-} from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -28,7 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  PieChart as RePieChart,
+  PieChart,
   Pie,
   Cell,
   LineChart,
@@ -37,561 +19,1065 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
+  AreaChart,
+  Area,
 } from "recharts";
 import * as d3 from "d3";
 import { sankey as d3Sankey, sankeyJustify, sankeyLinkHorizontal } from "d3-sankey";
 import { chord as d3Chord, ribbon } from "d3-chord";
+import {
+  AlertTriangle,
+  RefreshCw,
+  BarChart3,
+  PieChart as PieChartIcon,
+  TrendingUp,
+  GitBranch,
+  ArrowRightLeft,
+  Link,
+  Grid3x3,
+  BoxSelect,
+  ScatterChart as ScatterIcon,
+  Filter,
+  ChevronDown,
+  Calendar,
+  MapPin,
+  ShieldAlert,
+  DollarSign,
+  Activity,
+  LayoutGrid,
+  TrendingDown,
+} from "lucide-react";
+import { CyberCase } from "@/app/api/cyber-cases/route";
 
-const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
-
-type GraphNode = {
-  id: string;
-  label: string;
-  type: string;
-  riskScore: number;
-  x?: number;
-  y?: number;
-};
-type GraphLink = {
-  source: string;
-  target: string;
-  type: string;
-  amount: number | null;
-  flagged: boolean;
-  date?: string;
-};
-type GraphPayload = {
-  configured: boolean;
-  nodes: GraphNode[];
-  links: GraphLink[];
-  clusters?: Array<{
-    memberCount: number;
-    maxRisk: number;
-    flagged: boolean;
-  }>;
-  error?: string;
-};
-
-const TAB_OPTIONS = [
-  { value: "network", label: "Node-Link Network", icon: GitBranch },
-  { value: "bar", label: "Bar / Column", icon: BarChart3 },
-  { value: "pie", label: "Pie / Donut", icon: PieChart },
-  { value: "line", label: "Line Graph", icon: TrendingUp },
-  { value: "sankey", label: "Sankey Flow", icon: ArrowRightLeft },
-  { value: "chord", label: "Chord Diagram", icon: Link },
-  { value: "heatmap", label: "Heatmap Grid", icon: Grid3x3 },
-  { value: "treemap", label: "Treemap", icon: BoxSelect },
-  { value: "scatter", label: "Scatter Plot", icon: ScatterIcon },
-  { value: "data", label: "Raw Data", icon: TableIcon },
+// Color palette
+const COLORS = [
+  "#00f3ff",
+  "#00ff66",
+  "#ff003c",
+  "#a855f7",
+  "#ff7a00",
+  "#f59e0b",
+  "#3b82f6",
+  "#ec4899",
+  "#10b981",
+  "#8b5cf6",
 ];
 
-const COLORS = ["#00f3ff", "#00ff66", "#ff003c", "#a855f7", "#ff7a00", "#f59e0b"];
+// Graph type definitions
+const TAB_OPTIONS = [
+  { value: "bar", label: "Bar / Column", icon: BarChart3, description: "Compare values across categories" },
+  { value: "pie", label: "Pie / Donut", icon: PieChartIcon, description: "Show parts of a whole" },
+  { value: "line", label: "Line / Trend", icon: TrendingUp, description: "Track changes over time" },
+  { value: "network", label: "Network Graph", icon: GitBranch, description: "Map relationships between entities" },
+  { value: "sankey", label: "Sankey Flow", icon: ArrowRightLeft, description: "Visualize flow of values" },
+  { value: "chord", label: "Chord Diagram", icon: Link, description: "Show connections between groups" },
+  { value: "heatmap", label: "Heatmap Grid", icon: Grid3x3, description: "Find density clusters" },
+  { value: "treemap", label: "Treemap", icon: BoxSelect, description: "Hierarchical size distribution" },
+  { value: "scatter", label: "Scatter Plot", icon: ScatterIcon, description: "Correlation between variables" },
+];
+
+// Custom tooltip component
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-gray-900/95 backdrop-blur-sm border border-cyan-500/30 p-3 rounded-lg shadow-2xl">
+        <p className="text-cyan-400 font-semibold mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} style={{ color: entry.color }} className="text-sm">
+            <span className="font-medium">{entry.name}:</span> {entry.value.toLocaleString()}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function FraudNetwork() {
-  const [graph, setGraph] = useState<GraphPayload>({
-    configured: false,
-    nodes: [],
-    links: [],
-    clusters: [],
-  });
-  const [status, setStatus] = useState("Loading investigation graph…");
-  const [activeTab, setActiveTab] = useState<string>("network");
+  const [cases, setCases] = useState<CyberCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("Loading cybersecurity data...");
+  const [activeTab, setActiveTab] = useState<string>("bar");
+  
+  // Filters
+  const [selectedYears, setSelectedYears] = useState<string[]>([]);
+  const [selectedIncidentTypes, setSelectedIncidentTypes] = useState<string[]>([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
-  async function loadGraph() {
-    setStatus("Loading investigation graph…");
+  // Load data from API
+  const loadData = async () => {
+    setLoading(true);
+    setStatus("Loading cybersecurity data...");
     try {
-      const response = await fetch("/api/graph", { cache: "no-store" });
-      const payload = (await response.json()) as GraphPayload;
-      if (!response.ok) throw new Error(payload.error || "Could not load graph.");
-      setGraph(payload);
-      setStatus(
-        payload.configured
-          ? `${payload.nodes.length} entities and ${payload.links.length} relationships loaded.`
-          : "Connect Supabase and import AMLSim data to activate the graph."
-      );
+      const response = await fetch("/api/cyber-cases");
+      const data = await response.json();
+      if (response.ok) {
+        setCases(data.cases);
+        setStatus(`Loaded ${data.cases.length.toLocaleString()} cyber incident cases`);
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not load graph.");
+      console.error("Failed to load data:", error);
+      setStatus("Failed to load data");
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    void loadGraph();
+    loadData();
   }, []);
 
-  // Derived data for charts
-  const chartData = useMemo(() => {
-    // Bar chart data (monthly)
-    const monthlyData: Array<{ name: string; amount: number; count: number }> = [];
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    for (let i = 0; i < 12; i++) {
-      monthlyData.push({
-        name: monthNames[i],
-        amount: Math.floor(Math.random() * 5000000) + 100000,
-        count: Math.floor(Math.random() * 500) + 50,
+  // Get unique options for filters
+  const { uniqueYears, uniqueIncidentTypes, uniqueCities, uniqueCategories } = useMemo(() => {
+    const years = [...new Set(cases.map(c => String(c.Year)))].sort();
+    const incidentTypes = [...new Set(cases.map(c => c.Incident_Type))].sort();
+    const cities = [...new Set(cases.map(c => c.City))].sort();
+    const categories = [...new Set(cases.map(c => c.Category))].sort();
+    return { uniqueYears: years, uniqueIncidentTypes: incidentTypes, uniqueCities: cities, uniqueCategories: categories };
+  }, [cases]);
+
+  // Filter the data
+  const filteredCases = useMemo(() => {
+    return cases.filter(c => {
+      const yearMatch = selectedYears.length === 0 || selectedYears.includes(String(c.Year));
+      const typeMatch = selectedIncidentTypes.length === 0 || selectedIncidentTypes.includes(c.Incident_Type);
+      const cityMatch = selectedCities.length === 0 || selectedCities.includes(c.City);
+      const categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(c.Category);
+      return yearMatch && typeMatch && cityMatch && categoryMatch;
+    });
+  }, [cases, selectedYears, selectedIncidentTypes, selectedCities, selectedCategories]);
+
+  // Aggregated data for charts
+  const aggregatedData = useMemo(() => {
+    // Yearly data
+    const yearlyData = (() => {
+      const map = new Map<number, { totalAmount: number; count: number }>();
+      filteredCases.forEach(c => {
+        const existing = map.get(c.Year) || { totalAmount: 0, count: 0 };
+        map.set(c.Year, {
+          totalAmount: existing.totalAmount + Number(c.Amount_Lost_INR),
+          count: existing.count + 1,
+        });
       });
-    }
+      return Array.from(map.entries())
+        .map(([year, data]) => ({
+          name: String(year),
+          amount: data.totalAmount,
+          count: data.count,
+        }))
+        .sort((a, b) => Number(a.name) - Number(b.name));
+    })();
 
-    // Pie chart data (transaction types)
-    const pieData = [
-      { name: "Cash", value: 60 },
-      { name: "Wire", value: 30 },
-      { name: "Crypto", value: 10 },
-    ];
+    // Incident type data
+    const incidentTypeData = (() => {
+      const map = new Map<string, { totalAmount: number; count: number }>();
+      filteredCases.forEach(c => {
+        const existing = map.get(c.Incident_Type) || { totalAmount: 0, count: 0 };
+        map.set(c.Incident_Type, {
+          totalAmount: existing.totalAmount + Number(c.Amount_Lost_INR),
+          count: existing.count + 1,
+        });
+      });
+      return Array.from(map.entries())
+        .map(([name, data]) => ({ name, amount: data.totalAmount, count: data.count }))
+        .sort((a, b) => b.count - a.count);
+    })();
 
-    // Line chart data (trends)
-    const lineData = [...Array(20)].map((_, i) => ({
-      day: `Day ${i + 1}`,
-      transactions: Math.floor(Math.random() * 300) + 50,
-      amount: Math.floor(Math.random() * 2000000) + 500000,
+    // City data
+    const cityData = (() => {
+      const map = new Map<string, { totalAmount: number; count: number }>();
+      filteredCases.forEach(c => {
+        const existing = map.get(c.City) || { totalAmount: 0, count: 0 };
+        map.set(c.City, {
+          totalAmount: existing.totalAmount + Number(c.Amount_Lost_INR),
+          count: existing.count + 1,
+        });
+      });
+      return Array.from(map.entries())
+        .map(([name, data]) => ({ name, amount: data.totalAmount, count: data.count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 15); // Top 15 cities
+    })();
+
+    // Category data
+    const categoryData = (() => {
+      const map = new Map<string, { totalAmount: number; count: number }>();
+      filteredCases.forEach(c => {
+        const existing = map.get(c.Category) || { totalAmount: 0, count: 0 };
+        map.set(c.Category, {
+          totalAmount: existing.totalAmount + Number(c.Amount_Lost_INR),
+          count: existing.count + 1,
+        });
+      });
+      return Array.from(map.entries())
+        .map(([name, data]) => ({ name, amount: data.totalAmount, count: data.count }))
+        .sort((a, b) => b.count - a.count);
+    })();
+
+    // Treemap data
+    const treemapData = {
+      name: "Cybersecurity Incidents",
+      children: categoryData.map(cat => ({
+        name: cat.name,
+        value: cat.count,
+        amount: cat.amount,
+        children: incidentTypeData.filter(
+          type => filteredCases.some(c => c.Category === cat.name && c.Incident_Type === type.name)
+        ).map(type => ({
+          name: type.name,
+          value: filteredCases.filter(c => c.Category === cat.name && c.Incident_Type === type.name).length,
+        })),
+      })),
+    };
+
+    // Scatter plot data: Day of year vs Amount
+    const scatterData = filteredCases.map((c, idx) => ({
+      x: c.Day,
+      y: Number(c.Amount_Lost_INR),
+      z: 50,
+      incidentType: c.Incident_Type,
+      city: c.City,
+      year: c.Year,
+      id: idx,
     }));
 
-    // Scatter plot data (amount vs 'speed')
-    const scatterData = graph.links
-      .filter((l) => l.amount !== null)
-      .map((l, i) => ({
-        x: (i + 1) % 100,
-        y: l.amount,
-        z: l.flagged ? 100 : 50,
-        flagged: l.flagged,
-        type: l.type,
-      }));
+    // Heatmap data
+    const heatmapData = (() => {
+      const yearIncidentMatrix: Record<string, Record<string, number>> = {};
+      uniqueYears.forEach(year => {
+        yearIncidentMatrix[year] = {};
+        uniqueIncidentTypes.forEach(type => {
+          yearIncidentMatrix[year][type] = 0;
+        });
+      });
 
-    // Treemap data (hierarchical)
-    const treemapData = {
-      name: "Entities",
-      children: [
-        {
-          name: "Accounts",
-          children: [
-            { name: "High Risk", value: 1000 },
-            { name: "Medium Risk", value: 800 },
-            { name: "Low Risk", value: 500 },
-          ],
-        },
-        {
-          name: "Individuals",
-          children: [
-            { name: "Suspected", value: 400 },
-            { name: "Witness", value: 200 },
-          ],
-        },
-        {
-          name: "Organizations",
-          value: 300,
-        },
-      ],
-    };
+      filteredCases.forEach(c => {
+        if (yearIncidentMatrix[c.Year]) {
+          yearIncidentMatrix[c.Year][c.Incident_Type] = 
+            (yearIncidentMatrix[c.Year][c.Incident_Type] || 0) + 1;
+        }
+      });
 
-    // Heatmap grid data
-    const heatmapData = [];
-    for (let x = 0; x < 10; x++) {
-      for (let y = 0; y < 10; y++) {
-        heatmapData.push({ x, y, value: Math.floor(Math.random() * 100) });
-      }
-    }
+      const data: { year: string; incidentType: string; count: number }[] = [];
+      Object.entries(yearIncidentMatrix).forEach(([year, types]) => {
+        Object.entries(types).forEach(([incidentType, count]) => {
+          data.push({ year, incidentType, count });
+        });
+      });
+      return data;
+    })();
 
     return {
-      monthlyData,
-      pieData,
-      lineData,
-      scatterData,
+      yearlyData,
+      incidentTypeData,
+      cityData,
+      categoryData,
       treemapData,
+      scatterData,
       heatmapData,
     };
-  }, [graph]);
+  }, [filteredCases, uniqueYears, uniqueIncidentTypes]);
 
-  const flaggedLinks = graph.links.filter((link) => link.flagged).length;
+  const totalAmount = useMemo(() => 
+    filteredCases.reduce((sum, c) => sum + Number(c.Amount_Lost_INR), 0),
+  [filteredCases]);
 
   return (
-    <section className="mx-auto w-full max-w-7xl">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <section className="mx-auto w-full max-w-7xl px-4 py-8">
+      {/* Header */}
+      <div className="mb-8 flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
         <div>
-          <div className="flex items-center gap-2 text-[#00f3ff]">
-            <Network className="size-5" />
-            <span className="font-mono text-xs font-bold tracking-widest">
-              FRAUD NETWORK INTELLIGENCE
+          <div className="flex items-center gap-2 text-cyan-400 mb-2">
+            <ShieldAlert className="size-6" />
+            <span className="font-mono text-sm font-bold tracking-widest uppercase">
+              Cyber Threat Intelligence
             </span>
           </div>
-          <h2 className="mt-2 text-2xl font-bold text-white">
-            Fraud analysis & money flow visualization
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-300">
-            This suite of charts visualizes the AMLSim (Anti-Money Laundering) transaction data.
-            Use the different views to explore trends, clusters, and suspicious activity.
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            Cybersecurity Incidents Dashboard
+          </h1>
+          <p className="text-gray-400 max-w-2xl leading-relaxed">
+            Explore and analyze cybersecurity incident data from 2019-2024. Use the tabs and filters to discover patterns,
+            trends, and high-risk areas.
           </p>
         </div>
-        <button
-          onClick={loadGraph}
-          className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#00f3ff]/50 px-3 text-sm font-semibold text-[#00f3ff] hover:bg-[#00f3ff]/10"
-        >
-          <RefreshCw className="size-4" /> Refresh
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/50 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20 transition-all"
+          >
+            <Filter className="size-4" />
+            Filters
+            <ChevronDown className={`size-4 transition-transform ${showFilters ? "rotate-180" : ""}`} />
+          </button>
+          <button
+            onClick={loadData}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all"
+          >
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-[#333] pb-2">
-        {TAB_OPTIONS.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={`inline-flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === tab.value
-                  ? "bg-[#00f3ff]/20 border border-[#00f3ff] border-b-0 text-[#00f3ff]"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              <Icon className="size-4" /> {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
-        <div className="min-h-[500px] overflow-hidden rounded-xl border border-[#333] bg-[#090d10] flex flex-col">
-          {graph.nodes.length > 0 ? (
-            <RenderChart
-              activeTab={activeTab}
-              graph={graph}
-              chartData={chartData}
-            />
-          ) : (
-            <div className="flex h-[500px] flex-col items-center justify-center p-6 text-center text-gray-400">
-              <Network className="mb-4 size-12 opacity-30" />
-              <p className="max-w-sm text-sm leading-6">{status}</p>
-            </div>
-          )}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Total Incidents</p>
+            <Activity className="text-cyan-400 size-5" />
+          </div>
+          <p className="text-3xl font-bold text-white">{filteredCases.length.toLocaleString()}</p>
+        </div>
+        
+        <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Total Loss (₹)</p>
+            <DollarSign className="text-emerald-400 size-5" />
+          </div>
+          <p className="text-3xl font-bold text-white">
+            {(totalAmount / 1_000_000).toFixed(2)} Cr
+          </p>
         </div>
 
-        <aside className="rounded-xl border border-[#333] bg-black/30 p-5">
-          <h3 className="font-mono text-sm font-bold text-white">Graph signals</h3>
-          <dl className="mt-5 space-y-5">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-gray-500">Entities</dt>
-              <dd className="mt-1 text-2xl font-bold text-white">{graph.nodes.length}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-gray-500">Transfers</dt>
-              <dd className="mt-1 text-2xl font-bold text-white">{graph.links.length}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-gray-500">Linked clusters</dt>
-              <dd className="mt-1 text-2xl font-bold text-white">{graph.clusters?.length ?? 0}</dd>
-            </div>
-            <div>
-              <dt className="flex items-center gap-2 text-xs uppercase tracking-wide text-red-300">
-                <AlertTriangle className="size-3" /> Flagged links
-              </dt>
-              <dd className="mt-1 text-2xl font-bold text-[#ff003c]">{flaggedLinks}</dd>
-            </div>
-          </dl>
-          <div className="mt-8 rounded-lg bg-[#00ff66]/[.07] p-3 text-xs leading-5 text-gray-300">
-            <ShieldCheck className="mb-2 size-4 text-[#00ff66]" />
-            Use these views to prioritise review; retain source evidence before creating a case.
+        <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Incident Types</p>
+            <LayoutGrid className="text-purple-400 size-5" />
           </div>
-        </aside>
+          <p className="text-3xl font-bold text-white">{uniqueIncidentTypes.length}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Cities Affected</p>
+            <MapPin className="text-orange-400 size-5" />
+          </div>
+          <p className="text-3xl font-bold text-white">{uniqueCities.length}</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      {showFilters && (
+        <div className="mb-8 bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-sm border border-gray-700 rounded-2xl p-6 shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <FilterSelect
+              label="Years"
+              options={uniqueYears}
+              selected={selectedYears}
+              onChange={setSelectedYears}
+              icon={<Calendar className="size-4" />}
+            />
+            <FilterSelect
+              label="Incident Types"
+              options={uniqueIncidentTypes}
+              selected={selectedIncidentTypes}
+              onChange={setSelectedIncidentTypes}
+              icon={<AlertTriangle className="size-4" />}
+            />
+            <FilterSelect
+              label="Cities"
+              options={uniqueCities}
+              selected={selectedCities}
+              onChange={setSelectedCities}
+              icon={<MapPin className="size-4" />}
+            />
+            <FilterSelect
+              label="Categories"
+              options={uniqueCategories}
+              selected={selectedCategories}
+              onChange={setSelectedCategories}
+              icon={<BoxSelect className="size-4" />}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-2 border-b border-gray-700 min-w-max">
+          {TAB_OPTIONS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`
+                  flex items-center gap-2 px-4 py-3 rounded-t-xl font-semibold text-sm transition-all border-b-2
+                  ${activeTab === tab.value
+                    ? "border-cyan-400 text-cyan-400 bg-cyan-500/10"
+                    : "border-transparent text-gray-400 hover:text-white hover:bg-white/5"}
+                `}
+              >
+                <Icon className="size-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Active Tab Info */}
+      <div className="mb-6 bg-cyan-500/5 border-l-4 border-cyan-400 rounded-r-lg p-4">
+        <p className="text-cyan-200 text-sm">
+          <span className="font-bold">{TAB_OPTIONS.find(t => t.value === activeTab)?.label}:</span>
+          {TAB_OPTIONS.find(t => t.value === activeTab)?.description}
+        </p>
+      </div>
+
+      {/* Main Chart Area */}
+      <div className="min-h-[600px] bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-sm border border-gray-700 rounded-2xl p-6 shadow-xl">
+        {loading ? (
+          <div className="h-[500px] flex flex-col items-center justify-center gap-4">
+            <RefreshCw className="size-10 text-cyan-400 animate-spin" />
+            <p className="text-gray-400 text-lg">{status}</p>
+          </div>
+        ) : (
+          <RenderChart
+            activeTab={activeTab}
+            data={aggregatedData}
+            filteredCases={filteredCases}
+            uniqueYears={uniqueYears}
+            uniqueIncidentTypes={uniqueIncidentTypes}
+            uniqueCities={uniqueCities}
+          />
+        )}
       </div>
     </section>
   );
 }
 
-// Component to render the active chart
+// Filter select component
+function FilterSelect({
+  label,
+  options,
+  selected,
+  onChange,
+  icon,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (vals: string[]) => void;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-semibold text-gray-300">
+        <span className="text-gray-500">{icon}</span>
+        {label}
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => onChange([])}
+          className={`
+            px-3 py-1.5 text-xs rounded-full border font-medium transition-all
+            ${selected.length === 0
+              ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+              : "bg-gray-800/50 text-gray-400 border-gray-700 hover:border-gray-600"}
+          `}
+        >
+          All
+        </button>
+        {options.slice(0, 10).map((option) => (
+          <button
+            key={option}
+            onClick={() => {
+              if (selected.includes(option)) {
+                onChange(selected.filter((s) => s !== option));
+              } else {
+                onChange([...selected, option]);
+              }
+            }}
+            className={`
+              px-3 py-1.5 text-xs rounded-full border font-medium transition-all max-w-[150px] truncate
+              ${selected.includes(option)
+                ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+                : "bg-gray-800/50 text-gray-400 border-gray-700 hover:border-gray-600"}
+            `}
+            title={option}
+          >
+            {option}
+          </button>
+        ))}
+        {options.length > 10 && (
+          <span className="px-3 py-1.5 text-xs rounded-full border border-gray-700 bg-gray-800/50 text-gray-500">
+            +{options.length - 10} more
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Render chart based on active tab
 function RenderChart({
   activeTab,
-  graph,
-  chartData,
+  data,
+  filteredCases,
+  uniqueYears,
+  uniqueIncidentTypes,
 }: {
   activeTab: string;
-  graph: GraphPayload;
-  chartData: any;
+  data: any;
+  filteredCases: CyberCase[];
+  uniqueYears: string[];
+  uniqueIncidentTypes: string[];
 }) {
   switch (activeTab) {
-    case "network":
-      return (
-        <div className="flex-1">
-          <ForceGraph2D
-            graphData={{
-              nodes: graph.nodes.map((n) => ({ ...n })),
-              links: graph.links.map((l) => ({ ...l })),
-            }}
-            nodeLabel={(node) => {
-              const n = node as GraphNode;
-              return `${n.label} (${n.type}) · risk ${n.riskScore}`;
-            }}
-            nodeColor={(node) => {
-              const n = node as GraphNode;
-              if (n.riskScore >= 70) return "#ff003c";
-              if (n.type === "account") return "#00f3ff";
-              if (n.type === "individual") return "#00ff66";
-              if (n.type === "organization") return "#a855f7";
-              return "#ffffff";
-            }}
-            nodeRelSize={6}
-            linkColor={(link) =>
-              (link as GraphLink).flagged ? "#ff003c" : "#52606d"
-            }
-            linkWidth={(link) => ((link as GraphLink).flagged ? 2 : 1)}
-            linkDirectionalArrowLength={3.5}
-            linkDirectionalArrowRelPos={1}
-            backgroundColor="#090d10"
-          />
-        </div>
-      );
     case "bar":
-      return (
-        <div className="flex-1 p-4">
-          <h3 className="text-white font-bold mb-4">Monthly Transaction Volume</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData.monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="name" stroke="#aaa" />
-              <YAxis stroke="#aaa" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111",
-                  border: "1px solid #333",
-                  color: "#fff",
-                }}
-              />
-              <Legend />
-              <Bar dataKey="amount" fill="#00f3ff" name="Amount (₹)" />
-              <Bar dataKey="count" fill="#00ff66" name="Count" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      );
+      return <BarChartComponent data={data} />;
     case "pie":
-      return (
-        <div className="flex-1 p-4">
-          <h3 className="text-white font-bold mb-4">Transaction Type Breakdown</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <RePieChart>
-              <Pie
-                data={chartData.pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={80}
-                outerRadius={120}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {chartData.pieData.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111",
-                  border: "1px solid #333",
-                  color: "#fff",
-                }}
-              />
-              <Legend />
-            </RePieChart>
-          </ResponsiveContainer>
-        </div>
-      );
+      return <PieChartComponent data={data} />;
     case "line":
-      return (
-        <div className="flex-1 p-4">
-          <h3 className="text-white font-bold mb-4">Transaction Trends Over Time</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData.lineData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="day" stroke="#aaa" />
-              <YAxis stroke="#aaa" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111",
-                  border: "1px solid #333",
-                  color: "#fff",
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="amount"
-                stroke="#00f3ff"
-                strokeWidth={2}
-                name="Amount (₹)"
-              />
-              <Line
-                type="monotone"
-                dataKey="transactions"
-                stroke="#00ff66"
-                strokeWidth={2}
-                name="Transaction Count"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      );
+      return <LineChartComponent data={data} />;
+    case "network":
+      return <NetworkComponent data={data} filteredCases={filteredCases} />;
     case "sankey":
-      return <SankeyComponent graph={graph} />;
+      return <SankeyComponent data={data} />;
     case "chord":
-      return <ChordComponent graph={graph} />;
+      return <ChordComponent data={data} />;
     case "heatmap":
-      return (
-        <div className="flex-1 p-4 overflow-auto">
-          <h3 className="text-white font-bold mb-4">Activity Cluster Heatmap</h3>
-          <div className="grid grid-cols-10 gap-1 max-w-2xl mx-auto">
-            {chartData.heatmapData.map((cell: any, i: number) => (
-              <div
-                key={i}
-                className="aspect-square rounded-sm"
-                style={{
-                  backgroundColor: `rgba(0,243,255,${cell.value / 100})`,
-                }}
-                title={`Value: ${cell.value}`}
-              />
-            ))}
-          </div>
-        </div>
-      );
+      return <HeatmapComponent data={data} uniqueYears={uniqueYears} uniqueIncidentTypes={uniqueIncidentTypes} />;
     case "treemap":
-      return (
-        <div className="flex-1 p-4">
-          <h3 className="text-white font-bold mb-4">Entity Hierarchy (Treemap)</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <Treemap
-              data={chartData.treemapData}
-              dataKey="value"
-              stroke="#fff"
-              content={<CustomTreemapContent />}
-            />
-          </ResponsiveContainer>
-        </div>
-      );
+      return <TreemapComponent data={data} />;
     case "scatter":
-      return (
-        <div className="flex-1 p-4">
-          <h3 className="text-white font-bold mb-4">
-            Transaction Amount vs. Speed (Scatter Plot)
-          </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis
-                type="number"
-                dataKey="x"
-                stroke="#aaa"
-                name="Order"
-              />
-              <YAxis
-                type="number"
-                dataKey="y"
-                stroke="#aaa"
-                name="Amount (₹)"
-              />
-              <ZAxis
-                type="number"
-                dataKey="z"
-                range={[20, 200]}
-                name="Risk"
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111",
-                  border: "1px solid #333",
-                  color: "#fff",
-                }}
-                cursor={{ strokeDasharray: "3 3" }}
-              />
-              <Legend />
-              <Scatter
-                name="Normal"
-                data={chartData.scatterData.filter((d: any) => !d.flagged)}
-                fill="#00f3ff"
-              />
-              <Scatter
-                name="Suspicious"
-                data={chartData.scatterData.filter((d: any) => d.flagged)}
-                fill="#ff003c"
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
-      );
-    case "data":
+      return <ScatterPlotComponent data={data} />;
     default:
-      return (
-        <div className="flex-1 overflow-auto p-4">
-          <h3 className="text-white font-bold mb-4">Synthetic AMLSim Data Output</h3>
-          <div className="overflow-x-auto rounded-lg border border-[#333]">
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead className="bg-[#111] text-xs uppercase text-gray-500 border-b border-[#333]">
-                <tr>
-                  <th className="px-4 py-3">Source Account</th>
-                  <th className="px-4 py-3">Target Account</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3 text-right">Amount (₹)</th>
-                  <th className="px-4 py-3 text-center">AML Flag</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#333]">
-                {graph.links.map((link, idx) => {
-                  const sourceId = typeof link.source === "object"
-                    ? (link.source as any).id
-                    : link.source;
-                  const targetId = typeof link.target === "object"
-                    ? (link.target as any).id
-                    : link.target;
-
-                  const sourceNode = graph.nodes.find((n) => n.id === sourceId) || {
-                    label: String(sourceId),
-                  };
-                  const targetNode = graph.nodes.find((n) => n.id === targetId) || {
-                    label: String(targetId),
-                  };
-                  return (
-                    <tr
-                      key={idx}
-                      className="hover:bg-white/5 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-mono">{sourceNode.label}</td>
-                      <td className="px-4 py-3 font-mono">{targetNode.label}</td>
-                      <td className="px-4 py-3">{link.type}</td>
-                      <td className="px-4 py-3 text-right font-mono text-green-400">
-                        {link.amount ? `₹${link.amount.toLocaleString()}` : "-"}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {link.flagged ? (
-                          <span className="inline-flex items-center rounded bg-[#ff003c]/20 px-2 py-1 text-xs font-medium text-[#ff003c]">
-                            Suspicious
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded bg-gray-500/20 px-2 py-1 text-xs font-medium text-gray-400">
-                            Normal
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      );
+      return null;
   }
 }
 
-// Custom Treemap Content Component
+function BarChartComponent({ data }: { data: any }) {
+  const [view, setView] = useState<"yearly" | "incident" | "city">("yearly");
+  const currentData = view === "yearly" ? data.yearlyData : view === "incident" ? data.incidentTypeData : data.cityData;
+
+  return (
+    <div className="h-[500px] w-full">
+      <div className="flex gap-3 mb-4">
+        <ViewToggle
+          options={[
+            { value: "yearly", label: "By Year", icon: <Calendar className="size-4" /> },
+            { value: "incident", label: "By Incident Type", icon: <AlertTriangle className="size-4" /> },
+            { value: "city", label: "By City (Top 15)", icon: <MapPin className="size-4" /> },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </div>
+      <ResponsiveContainer width="100%" height="90%">
+        <BarChart data={currentData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+          <defs>
+            <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#00f3ff" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#00f3ff" stopOpacity={0.2} />
+            </linearGradient>
+            <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#00ff66" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#00ff66" stopOpacity={0.2} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+          <XAxis
+            dataKey="name"
+            stroke="#9CA3AF"
+            tick={{ fill: "#9CA3AF", fontSize: 12 }}
+            angle={view === "city" || view === "incident" ? -45 : 0}
+            textAnchor={view === "city" || view === "incident" ? "end" : "middle"}
+            height={view === "city" || view === "incident" ? 80 : 30}
+          />
+          <YAxis yAxisId="left" stroke="#00f3ff" tick={{ fill: "#00f3ff" }} />
+          <YAxis yAxisId="right" orientation="right" stroke="#00ff66" tick={{ fill: "#00ff66" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ paddingTop: 20 }} />
+          <Bar yAxisId="left" dataKey="amount" name="Amount (₹)" fill="url(#colorAmount)" radius={[4, 4, 0, 0]} />
+          <Bar yAxisId="right" dataKey="count" name="Incident Count" fill="url(#colorCount)" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function PieChartComponent({ data }: { data: any }) {
+  const [view, setView] = useState<"incident" | "category">("incident");
+  const currentData = view === "incident" ? data.incidentTypeData : data.categoryData;
+
+  return (
+    <div className="h-[500px] w-full">
+      <div className="flex gap-3 mb-4">
+        <ViewToggle
+          options={[
+            { value: "incident", label: "By Incident Type", icon: <AlertTriangle className="size-4" /> },
+            { value: "category", label: "By Category", icon: <BoxSelect className="size-4" /> },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </div>
+      <ResponsiveContainer width="100%" height="90%">
+        <PieChart>
+          <Pie
+            data={currentData}
+            cx="50%"
+            cy="50%"
+            innerRadius={100}
+            outerRadius={160}
+            paddingAngle={2}
+            dataKey="count"
+          >
+            {currentData.map((entry: any, index: number) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip content={<CustomTooltip />} />
+          <Legend layout="vertical" verticalAlign="middle" align="right" />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function LineChartComponent({ data }: { data: any }) {
+  return (
+    <div className="h-[500px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data.yearlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <defs>
+            <linearGradient id="colorAmountGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#00f3ff" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#00f3ff" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="colorCountGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#00ff66" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#00ff66" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+          <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: "#9CA3AF" }} />
+          <YAxis yAxisId="left" stroke="#00f3ff" tick={{ fill: "#00f3ff" }} />
+          <YAxis yAxisId="right" orientation="right" stroke="#00ff66" tick={{ fill: "#00ff66" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Area
+            yAxisId="left"
+            type="monotone"
+            dataKey="amount"
+            name="Amount (₹)"
+            stroke="#00f3ff"
+            strokeWidth={3}
+            fill="url(#colorAmountGradient)"
+          />
+          <Area
+            yAxisId="right"
+            type="monotone"
+            dataKey="count"
+            name="Incident Count"
+            stroke="#00ff66"
+            strokeWidth={3}
+            fill="url(#colorCountGradient)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function NetworkComponent({ filteredCases }: { filteredCases: CyberCase[] }) {
+  // Build network data: cities connected by same incident type
+  const networkData = useMemo(() => {
+    const cityMap = new Map<string, { name: string; count: number }>();
+    const links: { source: string; target: string; value: number }[] = [];
+
+    filteredCases.forEach(c => {
+      if (!cityMap.has(c.City)) {
+        cityMap.set(c.City, { name: c.City, count: 0 });
+      }
+      cityMap.get(c.City)!.count++;
+    });
+
+    // Connect cities that share incident types
+    const typeCityMap = new Map<string, string[]>();
+    filteredCases.forEach(c => {
+      if (!typeCityMap.has(c.Incident_Type)) typeCityMap.set(c.Incident_Type, []);
+      if (!typeCityMap.get(c.Incident_Type)!.includes(c.City)) {
+        typeCityMap.get(c.Incident_Type)!.push(c.City);
+      }
+    });
+
+    const linkMap = new Map<string, number>();
+    typeCityMap.forEach(cities => {
+      for (let i = 0; i < cities.length; i++) {
+        for (let j = i + 1; j < cities.length; j++) {
+          const key = [cities[i], cities[j]].sort().join("|");
+          linkMap.set(key, (linkMap.get(key) || 0) + 1);
+        }
+      }
+    });
+
+    linkMap.forEach((value, key) => {
+      const [source, target] = key.split("|");
+      links.push({ source, target, value });
+    });
+
+    const nodes = Array.from(cityMap.values()).sort((a, b) => b.count - a.count).slice(0, 15);
+
+    return { nodes, links };
+  }, [filteredCases]);
+
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (!svgRef.current || networkData.nodes.length < 2) return;
+
+    const width = svgRef.current.clientWidth || 800;
+    const height = svgRef.current.clientHeight || 500;
+
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
+
+    const g = svg.append("g");
+
+    const simulation = d3
+      .forceSimulation(networkData.nodes as any)
+      .force("charge", d3.forceManyBody().strength(-400))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("link", d3.forceLink(networkData.links).id((d: any) => d.name).distance(120));
+
+    const link = g
+      .append("g")
+      .selectAll("line")
+      .data(networkData.links)
+      .join("line")
+      .attr("stroke", "#00f3ff")
+      .attr("stroke-opacity", 0.4)
+      .attr("stroke-width", (d: any) => Math.sqrt(d.value) * 2);
+
+    const node = g
+      .append("g")
+      .selectAll("circle")
+      .data(networkData.nodes)
+      .join("circle")
+      .attr("r", (d: any) => Math.sqrt(d.count) * 3 + 5)
+      .attr("fill", (d, i) => COLORS[i % COLORS.length])
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 2)
+      .call(drag(simulation));
+
+    const label = g
+      .append("g")
+      .selectAll("text")
+      .data(networkData.nodes)
+      .join("text")
+      .attr("text-anchor", "middle")
+      .attr("fill", "#fff")
+      .attr("font-size", "10px")
+      .attr("font-weight", "bold")
+      .text((d: any) => d.name);
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", (d: any) => d.source.x)
+        .attr("y1", (d: any) => d.source.y)
+        .attr("x2", (d: any) => d.target.x)
+        .attr("y2", (d: any) => d.target.y);
+
+      node.attr("cx", (d: any) => d.x).attr("cy", (d: any) => d.y);
+
+      label.attr("x", (d: any) => d.x).attr("y", (d: any) => d.y - 15);
+    });
+
+    // Zoom behavior
+    const zoom = d3.zoom().scaleExtent([0.5, 8]).on("zoom", (event) => {
+      g.attr("transform", event.transform);
+    });
+    svg.call(zoom);
+
+    function drag(simulation: d3.Simulation<any, undefined>) {
+      function dragstarted(event: any) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        event.subject.fx = event.subject.x;
+        event.subject.fy = event.subject.y;
+      }
+
+      function dragged(event: any) {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+      }
+
+      function dragended(event: any) {
+        if (!event.active) simulation.alphaTarget(0);
+        event.subject.fx = null;
+        event.subject.fy = null;
+      }
+
+      return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+    }
+  }, [networkData]);
+
+  return (
+    <div className="h-[500px] w-full">
+      <svg ref={svgRef} className="w-full h-full" />
+    </div>
+  );
+}
+
+function SankeyComponent({ data }: { data: any }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (!svgRef.current || data.categoryData.length === 0) return;
+
+    const width = svgRef.current.clientWidth || 800;
+    const height = svgRef.current.clientHeight || 500;
+
+    // Simple sankey from category to incident type
+    const categories = data.categoryData.slice(0, 5).map((c: any) => c.name);
+    const incidentTypes = data.incidentTypeData.slice(0, 5).map((c: any) => c.name);
+    
+    const nodes: { name: string }[] = [
+      ...categories.map(name => ({ name })),
+      ...incidentTypes.map(name => ({ name })),
+    ];
+
+    const nodeIndex = new Map(nodes.map((n, i) => [n.name, i]));
+
+    const links: { source: any; target: any; value: number }[] = [];
+    categories.forEach(cat => {
+      incidentTypes.forEach(type => {
+        const count = data.treemapData.children
+          .find((c: any) => c.name === cat)
+          ?.children?.find((t: any) => t.name === type)?.value || 0;
+        if (count > 0) {
+          links.push({
+            source: nodeIndex.get(cat),
+            target: nodeIndex.get(type),
+            value: count,
+          });
+        }
+      });
+    });
+
+    if (links.length === 0) return;
+
+    const sankey = d3Sankey()
+      .nodeId((d: any) => d.name)
+      .nodeWidth(20)
+      .nodePadding(20)
+      .extent([[1, 1], [width - 1, height - 6]]);
+
+    const { nodes: sankeyNodes, links: sankeyLinks } = sankey({
+      nodes: nodes.map(d => ({ ...d })),
+      links: links.map(d => ({ ...d })),
+    }) as any;
+
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
+
+    // Draw links
+    svg
+      .append("g")
+      .attr("fill", "none")
+      .selectAll("path")
+      .data(sankeyLinks)
+      .join("path")
+      .attr("d", sankeyLinkHorizontal())
+      .attr("stroke", (d: any) => COLORS[d.index % COLORS.length])
+      .attr("stroke-opacity", 0.5)
+      .attr("stroke-width", (d: any) => Math.max(1, d.width));
+
+    // Draw nodes
+    svg
+      .append("g")
+      .selectAll("rect")
+      .data(sankeyNodes)
+      .join("rect")
+      .attr("x", (d: any) => d.x0)
+      .attr("y", (d: any) => d.y0)
+      .attr("height", (d: any) => d.y1 - d.y0)
+      .attr("width", (d: any) => d.x1 - d.x0)
+      .attr("fill", (d: any, i: number) => COLORS[i % COLORS.length])
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1);
+
+    // Draw labels
+    svg
+      .append("g")
+      .selectAll("text")
+      .data(sankeyNodes)
+      .join("text")
+      .attr("x", (d: any) => (d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6))
+      .attr("y", (d: any) => (d.y1 + d.y0) / 2)
+      .attr("dy", "0.35em")
+      .attr("text-anchor", (d: any) => (d.x0 < width / 2 ? "start" : "end"))
+      .attr("fill", "#fff")
+      .attr("font-size", "12px")
+      .attr("font-weight", "600")
+      .text((d: any) => d.name);
+  }, [data]);
+
+  return (
+    <div className="h-[500px] w-full">
+      <svg ref={svgRef} className="w-full h-full" />
+    </div>
+  );
+}
+
+function ChordComponent({ data }: { data: any }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (!svgRef.current || data.categoryData.length < 2) return;
+
+    const width = svgRef.current.clientWidth || 600;
+    const height = svgRef.current.clientHeight || 500;
+    const innerRadius = Math.min(width, height) * 0.3;
+    const outerRadius = innerRadius + 20;
+
+    // Get top categories
+    const categories = data.categoryData.slice(0, 8).map((c: any) => c.name);
+    const n = categories.length;
+
+    // Create a dummy matrix for the chord diagram
+    const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i !== j) {
+          matrix[i][j] = Math.floor(Math.random() * 50 + 10);
+        }
+      }
+    }
+
+    const chords = d3Chord()(matrix);
+
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
+
+    const g = svg
+      .attr("viewBox", [-width / 2, -height / 2, width, height])
+      .append("g");
+
+    const ribbonGen = ribbon().radius(innerRadius);
+
+    // Draw ribbons
+    g.append("g")
+      .selectAll("path")
+      .data(chords)
+      .join("path")
+      .attr("d", ribbonGen)
+      .attr("fill", (d: any) => COLORS[d.source.index % COLORS.length])
+      .attr("fill-opacity", 0.6)
+      .style("mix-blend-mode", "multiply");
+
+    // Draw groups
+    const group = g.append("g").selectAll("g").data(chords.groups).join("g");
+
+    group
+      .append("path")
+      .attr("d", d3.arc().innerRadius(innerRadius).outerRadius(outerRadius))
+      .attr("fill", (d: any) => COLORS[d.index % COLORS.length]);
+
+    // Draw labels
+    group
+      .append("text")
+      .each((d: any) => (d.angle = (d.startAngle + d.endAngle) / 2))
+      .attr("dy", "0.35em")
+      .attr("transform", (d: any) => `
+        rotate(${(d.angle * 180 / Math.PI - 90)})
+        translate(${outerRadius + 10})
+        ${d.angle > Math.PI ? "rotate(180)" : ""}
+      `)
+      .attr("text-anchor", (d: any) => (d.angle > Math.PI ? "end" : "start"))
+      .attr("fill", "#fff")
+      .attr("font-size", "12px")
+      .attr("font-weight", "600")
+      .text((d: any) => categories[d.index]);
+  }, [data]);
+
+  return (
+    <div className="h-[500px] w-full">
+      <svg ref={svgRef} className="w-full h-full" />
+    </div>
+  );
+}
+
+function HeatmapComponent({
+  data,
+  uniqueYears,
+  uniqueIncidentTypes,
+}: {
+  data: any;
+  uniqueYears: string[];
+  uniqueIncidentTypes: string[];
+}) {
+  return (
+    <div className="h-[500px] w-full overflow-auto">
+      <div className="flex flex-col gap-1 p-4 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex">
+          <div className="w-32"></div>
+          {uniqueYears.map(year => (
+            <div key={year} className="flex-1 text-center text-xs font-bold text-gray-400 px-1 py-2">
+              {year}
+            </div>
+          ))}
+        </div>
+        {/* Rows */}
+        {uniqueIncidentTypes.slice(0, 15).map(type => {
+          const maxCount = Math.max(...data.heatmapData.map((d: any) => d.count));
+          return (
+            <div key={type} className="flex items-center gap-1">
+              <div className="w-32 text-xs font-semibold text-gray-300 truncate pr-2">
+                {type}
+              </div>
+              {uniqueYears.map(year => {
+                const cellData = data.heatmapData.find(
+                  (d: any) => d.year === year && d.incidentType === type
+                );
+                const opacity = cellData ? cellData.count / (maxCount || 1) : 0;
+                return (
+                  <div
+                    key={`${year}-${type}`}
+                    className="flex-1 aspect-square rounded-sm border border-gray-700/50 transition-all hover:scale-110 cursor-pointer"
+                    style={{
+                      backgroundColor: `rgba(0, 243, 255, ${0.1 + opacity * 0.9})`,
+                    }}
+                    title={`${type} (${year}): ${cellData?.count || 0} incidents`}
+                  />
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TreemapComponent({ data }: { data: any }) {
+  return (
+    <div className="h-[500px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <Treemap
+          data={data.treemapData}
+          dataKey="value"
+          stroke="#1f2937"
+          strokeWidth={2}
+          content={<CustomTreemapContent />}
+        />
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 const CustomTreemapContent = (props: any) => {
-  const { x, y, width, height, index, name, depth } = props;
+  const { x, y, width, height, name, depth } = props;
+  if (depth === 0) return null;
+
+  const index = Math.floor(Math.random() * COLORS.length);
   return (
     <g>
       <rect
@@ -600,19 +1086,19 @@ const CustomTreemapContent = (props: any) => {
         width={width}
         height={height}
         style={{
-          fill: depth === 1 ? COLORS[index % COLORS.length] : "rgba(0,243,255,0.3)",
-          stroke: "#333",
+          fill: depth === 1 ? COLORS[index % COLORS.length] : "rgba(0,243,255,0.2)",
+          stroke: "#374151",
           strokeWidth: 2,
         }}
       />
-      {width > 30 && height > 30 && (
+      {width > 40 && height > 30 && (
         <text
           x={x + width / 2}
           y={y + height / 2}
           textAnchor="middle"
           dominantBaseline="middle"
-          fill="#fff"
-          fontSize="12"
+          fill="#ffffff"
+          fontSize="12px"
           fontWeight="bold"
         >
           {name}
@@ -622,217 +1108,63 @@ const CustomTreemapContent = (props: any) => {
   );
 };
 
-// Sankey Diagram Component
-function SankeyComponent({ graph }: { graph: GraphPayload }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  useEffect(() => {
-    if (!svgRef.current) return;
-
-    const width = svgRef.current.clientWidth || 800;
-    const height = svgRef.current.clientHeight || 500;
-
-    // Simple dummy data first to make sure Sankey works
-    const dummyNodes = [
-      { id: "A", name: "Account A" },
-      { id: "B", name: "Account B" },
-      { id: "C", name: "Account C" },
-      { id: "D", name: "Account D" },
-    ];
-
-    const dummyLinks = [
-      { source: "A", target: "B", value: 500, flagged: false },
-      { source: "A", target: "C", value: 300, flagged: true },
-      { source: "B", target: "D", value: 400, flagged: false },
-      { source: "C", target: "D", value: 300, flagged: false },
-    ];
-
-    // Create sankey generator
-    const sankey = d3Sankey()
-      .nodeId((d: any) => d.id)
-      .nodeWidth(20)
-      .nodePadding(30)
-      .extent([[1, 1], [width - 1, height - 1]]);
-
-    try {
-      // Pass copies of data to sankey() because it mutates them
-      const sankeyData = sankey({
-        nodes: dummyNodes.map((d) => ({ ...d })),
-        links: dummyLinks.map((d) => ({ ...d })),
-      });
-
-      // Clear previous svg
-      const svg = d3.select(svgRef.current);
-      svg.selectAll("*").remove();
-
-      // Draw links
-      svg
-        .append("g")
-        .attr("fill", "none")
-        .selectAll("path")
-        .data(sankeyData.links)
-        .join("path")
-        .attr("d", sankeyLinkHorizontal())
-        .attr("stroke", (d: any) => (d.flagged ? "#ff003c" : "rgba(0,243,255,0.6)"))
-        .attr("stroke-width", (d: any) => Math.max(1, d.width))
-        .style("mix-blend-mode", "multiply");
-
-      // Draw nodes
-      svg
-        .append("g")
-        .selectAll("rect")
-        .data(sankeyData.nodes)
-        .join("rect")
-        .attr("x", (d: any) => d.x0)
-        .attr("y", (d: any) => d.y0)
-        .attr("height", (d: any) => d.y1 - d.y0)
-        .attr("width", (d: any) => d.x1 - d.x0)
-        .attr("fill", "#00f3ff")
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 1);
-
-      // Draw node labels
-      svg
-        .append("g")
-        .selectAll("text")
-        .data(sankeyData.nodes)
-        .join("text")
-        .attr("x", (d: any) => (d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6))
-        .attr("y", (d: any) => (d.y1 + d.y0) / 2)
-        .attr("dy", "0.35em")
-        .attr("text-anchor", (d: any) => (d.x0 < width / 2 ? "start" : "end"))
-        .attr("fill", "#fff")
-        .attr("font-size", "12px")
-        .attr("font-weight", "500")
-        .text((d: any) => d.name);
-    } catch (e) {
-      console.error("Sankey error:", e);
-    }
-  }, [graph]);
-
+function ScatterPlotComponent({ data }: { data: any }) {
   return (
-    <div className="flex-1 p-4">
-      <h3 className="text-white font-bold mb-4">Money Flow (Sankey Diagram)</h3>
-      <div className="h-full">
-        <svg ref={svgRef} className="w-full h-full" />
-      </div>
+    <div className="h-[500px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <XAxis
+            type="number"
+            dataKey="x"
+            name="Day of Month"
+            stroke="#9CA3AF"
+            tick={{ fill: "#9CA3AF" }}
+          />
+          <YAxis
+            type="number"
+            dataKey="y"
+            name="Amount (₹)"
+            stroke="#9CA3AF"
+            tick={{ fill: "#9CA3AF" }}
+          />
+          <ZAxis type="number" dataKey="z" range={[20, 200]} name="Size" />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Scatter name="Incidents" data={data.scatterData} fill="#00f3ff" />
+        </ScatterChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-// Chord Diagram Component
-function ChordComponent({ graph }: { graph: GraphPayload }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  useEffect(() => {
-    if (!svgRef.current) return;
-
-    try {
-      const width = svgRef.current.clientWidth || 600;
-      const height = svgRef.current.clientHeight || 500;
-      const innerRadius = Math.min(width, height) * 0.35;
-      const outerRadius = innerRadius + 15;
-
-      // Get top nodes by degree (or use dummy data if not enough)
-      let topNodes = graph.nodes.slice(0, 6);
-      if (topNodes.length < 2) {
-        topNodes = [
-          { id: "1", label: "Node 1", type: "account", riskScore: 50 },
-          { id: "2", label: "Node 2", type: "account", riskScore: 30 },
-          { id: "3", label: "Node 3", type: "individual", riskScore: 70 },
-          { id: "4", label: "Node 4", type: "organization", riskScore: 20 },
-        ];
-      }
-
-      const nodeIndex = new Map(topNodes.map((n, i) => [n.id, i]));
-      const n = topNodes.length;
-
-      // Create adjacency matrix
-      const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-      if (graph.links.length > 0) {
-        graph.links.forEach((l) => {
-          const s = typeof l.source === "object" ? (l.source as any).id : l.source;
-          const t = typeof l.target === "object" ? (l.target as any).id : l.target;
-          const i = nodeIndex.get(s);
-          const j = nodeIndex.get(t);
-          if (i !== undefined && j !== undefined) {
-            matrix[i][j] += (l.amount || 100);
-          }
-        });
-      } else {
-        // Dummy matrix if no links
-        for (let i = 0; i < n; i++) {
-          for (let j = 0; j < n; j++) {
-            if (i !== j) {
-              matrix[i][j] = Math.floor(Math.random() * 200) + 50;
-            }
-          }
-        }
-      }
-
-      // Generate chord layout
-      const chords = d3Chord()(matrix);
-
-      const svg = d3.select(svgRef.current);
-      svg.selectAll("*").remove();
-
-      const g = svg
-        .attr("viewBox", [-width / 2, -height / 2, width, height])
-        .append("g");
-
-      const ribbonGenerator = ribbon().radius(innerRadius);
-
-      // Draw ribbons
-      g.append("g")
-        .selectAll("path")
-        .data(chords)
-        .join("path")
-        .attr("d", ribbonGenerator)
-        .attr("fill", (d: any) => COLORS[d.source.index % COLORS.length])
-        .attr("fill-opacity", 0.6)
-        .style("mix-blend-mode", "multiply");
-
-      // Draw groups
-      const group = g
-        .append("g")
-        .selectAll("g")
-        .data(chords.groups)
-        .join("g");
-
-      group
-        .append("path")
-        .attr("d", d3.arc().innerRadius(innerRadius).outerRadius(outerRadius))
-        .attr("fill", (d: any) => COLORS[d.index % COLORS.length])
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 1);
-
-      // Draw labels
-      group
-        .append("text")
-        .each((d: any) => (d.angle = (d.startAngle + d.endAngle) / 2))
-        .attr("dy", ".35em")
-        .attr("transform", (d: any) => `
-          rotate(${(d.angle * 180 / Math.PI - 90)})
-          translate(${outerRadius + 10})
-          ${d.angle > Math.PI ? "rotate(180)" : ""}
-        `)
-        .attr("text-anchor", (d: any) => (d.angle > Math.PI ? "end" : "start"))
-        .attr("fill", "#fff")
-        .attr("font-size", "12px")
-        .attr("font-weight", "500")
-        .text((d: any) => topNodes[d.index].label);
-    } catch (e) {
-      console.error("Chord diagram error:", e);
-    }
-  }, [graph]);
-
+// View toggle component
+function ViewToggle({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: string; label: string; icon: React.ReactNode }[];
+  value: string;
+  onChange: (val: string) => void;
+}) {
   return (
-    <div className="flex-1 p-4">
-      <h3 className="text-white font-bold mb-4">Inter-Account Relationships (Chord Diagram)</h3>
-      <div className="h-full">
-        <svg ref={svgRef} className="w-full h-full" />
-      </div>
+    <div className="inline-flex bg-gray-800/50 p-1 rounded-xl border border-gray-700">
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`
+            flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+            ${value === opt.value
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+              : "text-gray-400 hover:text-gray-200"}
+          `}
+        >
+          {opt.icon}
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }
-
