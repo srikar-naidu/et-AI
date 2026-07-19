@@ -15,6 +15,7 @@ import {
   Siren,
   ArrowLeft,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
@@ -58,7 +59,7 @@ function Home() {
       icon: <Activity className="w-8 h-8 text-[#00f3ff]" />,
       color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
       bgColor: "bg-[#00f3ff]/10",
-      glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(0,243,255,0.4)]",
     },
     {
       id: "counterfeit-scanner",
@@ -67,7 +68,7 @@ function Home() {
       icon: <ScanLine className="w-8 h-8 text-[#00ff66]" />,
       color: "border-[#00ff66]/30 hover:border-[#00ff66]",
       bgColor: "bg-[#00ff66]/10",
-      glowColor: "shadow-[0_0_30px_rgba(0,255,102,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(0,255,102,0.4)]",
     },
     {
       id: "phishing-disassembler",
@@ -76,7 +77,7 @@ function Home() {
       icon: <LinkIcon className="w-8 h-8 text-[#ff003c]" />,
       color: "border-[#ff003c]/30 hover:border-[#ff003c]",
       bgColor: "bg-[#ff003c]/10",
-      glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(255,0,60,0.4)]",
     },
     {
       id: "deepfake-analyzer",
@@ -85,7 +86,7 @@ function Home() {
       icon: <ShieldAlert className="w-8 h-8 text-purple-400" />,
       color: "border-purple-400/30 hover:border-purple-400",
       bgColor: "bg-purple-400/10",
-      glowColor: "shadow-[0_0_30px_rgba(168,85,247,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(168,85,247,0.4)]",
     },
     {
       id: "geospatial-mapper",
@@ -95,7 +96,7 @@ function Home() {
       icon: <MapPin className="w-8 h-8 text-amber-400" />,
       color: "border-amber-400/30 hover:border-amber-400",
       bgColor: "bg-amber-400/10",
-      glowColor: "shadow-[0_0_30px_rgba(251,191,36,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(251,191,36,0.4)]",
     },
     {
       id: "citizen-report",
@@ -104,16 +105,7 @@ function Home() {
       icon: <FileWarning className="w-8 h-8 text-[#00f3ff]" />,
       color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
       bgColor: "bg-[#00f3ff]/10",
-      glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
-    },
-    {
-      id: "incident-data-visualization",
-      title: "Incident Data Visualization",
-      description: "Explore cyber incident data with interactive charts and filters.",
-      icon: <Activity className="w-8 h-8 text-[#00f3ff]" />,
-      color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
-      bgColor: "bg-[#00f3ff]/10",
-      glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(0,243,255,0.4)]",
     },
     {
       id: "fraud-network",
@@ -122,7 +114,16 @@ function Home() {
       icon: <Network className="w-8 h-8 text-[#ff003c]" />,
       color: "border-[#ff003c]/30 hover:border-[#ff003c]",
       bgColor: "bg-[#ff003c]/10",
-      glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(255,0,60,0.4)]",
+    },
+    {
+      id: "incident-data-visualization",
+      title: "Incident Data Visualization",
+      description: "Explore cyber incident data with interactive charts and filters.",
+      icon: <BarChart3 className="w-8 h-8 text-[#00ff66]" />,
+      color: "border-[#00ff66]/30 hover:border-[#00ff66]",
+      bgColor: "bg-[#00ff66]/10",
+      glowColor: "shadow-[0_0_50px_rgba(0,255,102,0.4)]",
     },
     {
       id: "reporting-guide",
@@ -131,7 +132,7 @@ function Home() {
       icon: <Siren className="w-8 h-8 text-[#ff003c]" />,
       color: "border-[#ff003c]/30 hover:border-[#ff003c]",
       bgColor: "bg-[#ff003c]/10",
-      glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
+      glowColor: "shadow-[0_0_50px_rgba(255,0,60,0.4)]",
     },
   ];
 
@@ -247,25 +248,25 @@ function Home() {
                       duration: 0.6,
                       ease: "easeOut",
                     }}
-                    whileHover={{ scale: 1.02, y: -4 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: 1.05, y: -8, rotate: 0.5 }}
+                    whileTap={{ scale: 0.97 }}
                     onClick={() => setActiveModule(mod.id)}
-                    className={`group relative bg-[#0d0d0d]/90 backdrop-blur-md border-2 ${mod.color} p-7 rounded-2xl cursor-pointer transition-all duration-300 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050505] focus-visible:ring-[#00f3ff]`}
+                    className={`group relative bg-[#0d0d0d]/95 backdrop-blur-xl border-2 ${mod.color} p-7 rounded-2xl cursor-pointer transition-all duration-300 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050505] focus-visible:ring-[#00f3ff]`}
                   >
                     {/* Background Glow on Hover */}
                     <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${mod.glowColor}`} />
 
                     <div className="relative z-10">
                       <div
-                        className={`mb-5 w-16 h-16 rounded-xl ${mod.bgColor} flex items-center justify-center border border-white/5 group-hover:scale-110 transition-transform duration-300`}
+                        className={`mb-5 w-16 h-16 rounded-xl ${mod.bgColor} flex items-center justify-center border border-white/5 group-hover:scale-125 transition-all duration-300 group-hover:rotate-5`}
                       >
                         {mod.icon}
                       </div>
                       <div className="flex items-start justify-between gap-4 mb-2">
-                        <h3 className="text-xl font-bold text-white">{mod.title}</h3>
-                        <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-all duration-300" />
+                        <h3 className="text-xl font-bold text-white group-hover:text-white/90 transition-colors">{mod.title}</h3>
+                        <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white group-hover:translate-x-3 transition-all duration-300" />
                       </div>
-                      <p className="text-sm text-gray-400 leading-relaxed">
+                      <p className="text-sm text-gray-400 leading-relaxed group-hover:text-gray-300 transition-colors">
                         {mod.description}
                       </p>
                     </div>
