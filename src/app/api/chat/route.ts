@@ -4,6 +4,20 @@ import { getGroqApiKey } from "@/lib/server-env";
 import { getClusterGraph } from "@/lib/fraud-intelligence";
 import { loadFraudGraph } from "@/lib/fraud-data";
 
+function createClusterFallback(context: NonNullable<ReturnType<typeof getClusterGraph>>, question: string) {
+  const { cluster, nodes, links } = context;
+  const deviceSignals = links.filter((link) => /device|phone|call|logged_in|paired/i.test(link.type)).length;
+  const crossBorder = nodes.filter((node) => /offshore|foreign|international|singapore/i.test(node.label)).map((node) => node.label);
+  return [
+    "Evidence-grounded cluster summary (LLM service unavailable):",
+    `The selected ${cluster.id} campaign contains ${cluster.memberCount} linked entities, with ${cluster.flaggedEdgeCount} flagged relationships and a maximum risk score of ${cluster.maxRisk}/100 (${cluster.riskLevel}).`,
+    `It records ${cluster.transferCount} transfers totaling INR ${cluster.totalTransferred.toLocaleString("en-IN")}. ${deviceSignals ? `${deviceSignals} device or phone relationships connect the entities.` : "No device or phone relationships are recorded."}`,
+    crossBorder.length ? `Potential cross-border link: ${crossBorder.join(", ")}.` : "No cross-border endpoint is identified in the available cluster data.",
+    `Requested focus: ${question.slice(0, 300)}`,
+    "This is an analytical lead, not a finding of guilt. Verify against source records before action.",
+  ].join("\n\n");
+}
+
 const SYSTEM_PROMPT_TEMPLATE = `You are the Citizen Fraud Shield Assistant, an official conversational AI for the Digital Public Safety Command Center. 
 Your job is to assist citizens who suspect they are being targeted by a scam, specifically digital arrests, phishing, or financial fraud.
 
@@ -21,15 +35,13 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(messages) || messages.length === 0 || messages.length > 30) {
       return NextResponse.json({ error: "Provide between 1 and 30 chat messages." }, { status: 400 });
     }
+    if (!messages.every((message) => message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string" && message.content.length > 0 && message.content.length <= 4000)) {
+      return NextResponse.json({ error: "Each message must be a user or assistant message no longer than 4,000 characters." }, { status: 400 });
+    }
 
     const graphContext = typeof clusterId === "string" ? getClusterGraph(await loadFraudGraph(), clusterId) : null;
 
     const apiKey = getGroqApiKey();
-    if (!apiKey) {
-      return NextResponse.json({ error: "GROQ_API_KEY not configured." }, { status: 500 });
-    }
-
-    const groq = new Groq({ apiKey });
 
     const LANGUAGE_NAMES: Record<string, string> = {
       en: "English",
@@ -53,18 +65,27 @@ export async function POST(request: NextRequest) {
       ? `You are the Fraud Network Intelligence Agent for an authorised investigator. Produce a concise, formal forensic narrative in ${LANGUAGE_NAMES[language] || "English"}. Explain linkages, transactions, and risk signals from the verified cluster facts only. Do not claim guilt, make legal conclusions, or invent evidence.${clusterPrompt}`
       : SYSTEM_PROMPT_TEMPLATE.replace("{{LANGUAGE}}", LANGUAGE_NAMES[language] || "English");
 
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages
-      ],
-      model: "llama-3.3-70b-versatile",
-      temperature: 0.5,
-      max_tokens: 400,
-    });
+    if (!apiKey) {
+      if (graphContext) return NextResponse.json({ reply: createClusterFallback(graphContext, messages[messages.length - 1].content), mode: "deterministic_fallback" });
+      return NextResponse.json({ error: "GROQ_API_KEY not configured." }, { status: 503 });
+    }
 
-    const content = chatCompletion.choices[0]?.message?.content;
-    return NextResponse.json({ reply: content });
+    try {
+      const groq = new Groq({ apiKey });
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        model: "llama-3.3-70b-versatile",
+        temperature: 0.5,
+        max_tokens: 400,
+      });
+      const content = chatCompletion.choices[0]?.message?.content;
+      if (content) return NextResponse.json({ reply: content, mode: "llm" });
+      throw new Error("Groq returned an empty completion");
+    } catch (providerError) {
+      console.error("Groq chat provider failed", providerError);
+      if (graphContext) return NextResponse.json({ reply: createClusterFallback(graphContext, messages[messages.length - 1].content), mode: "deterministic_fallback" });
+      return NextResponse.json({ error: "Chat service is temporarily unavailable. Please try again." }, { status: 503 });
+    }
   } catch (error: any) {
     console.error("Chat API error:", error.message);
     return NextResponse.json({ error: "Chat failed" }, { status: 500 });
