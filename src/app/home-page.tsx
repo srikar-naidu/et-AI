@@ -2,34 +2,33 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 import {
   ShieldAlert,
   ScanLine,
   Link as LinkIcon,
   Activity,
   MapPin,
-  FileWarning,
   Network,
-  FolderSearch,
   Siren,
   ArrowLeft,
   ChevronRight,
   BarChart3,
+  Fingerprint,
 } from "lucide-react";
 import VoiceShield from "@/components/VoiceShield";
 import CounterfeitScanner from "@/components/CounterfeitScanner";
 import PhishingDisassembler from "@/components/PhishingDisassembler";
 import DeepfakeAnalyzer from "@/components/DeepfakeAnalyzer";
 import ChatbotWidget from "@/components/ChatbotWidget";
+import DigitalArrestPatterns from "@/components/DigitalArrestPatterns";
+import IncidentDataVisualization from "@/components/IncidentDataVisualization";
+import FraudNetwork from "@/components/FraudNetwork";
+import ReportingGuide from "@/components/ReportingGuide";
 
 const GeospatialMapper = dynamic(() => import("@/components/GeospatialMapper"), {
   ssr: false,
 });
-import CitizenReport from "@/components/CitizenReport";
-import IncidentDataVisualization from "@/components/IncidentDataVisualization";
-import FraudNetwork from "@/components/FraudNetwork";
-import ReportingGuide from "@/components/ReportingGuide";
 
 function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
@@ -99,10 +98,10 @@ function Home() {
       glowColor: "shadow-[0_0_50px_rgba(251,191,36,0.4)]",
     },
     {
-      id: "citizen-report",
-      title: "Citizen Incident Report",
-      description: "Create a secure case record and add anonymised incident signals to the map.",
-      icon: <FileWarning className="w-8 h-8 text-[#00f3ff]" />,
+      id: "digital-arrest-patterns",
+      title: "Digital Arrest Pattern Lab",
+      description: "Scam patterns, call-flow sequences, number-spoofing signatures, and script templates for digital-arrest detection.",
+      icon: <Fingerprint className="w-8 h-8 text-[#00f3ff]" />,
       color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
       bgColor: "bg-[#00f3ff]/10",
       glowColor: "shadow-[0_0_50px_rgba(0,243,255,0.4)]",
@@ -299,7 +298,7 @@ function Home() {
                 {activeModule === "phishing-disassembler" && <PhishingDisassembler />}
                 {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
                 {activeModule === "geospatial-mapper" && <GeospatialMapper />}
-                {activeModule === "citizen-report" && <CitizenReport />}
+                {activeModule === "digital-arrest-patterns" && <DigitalArrestPatterns />}
                 {activeModule === "incident-data-visualization" && <IncidentDataVisualization />}
                 {activeModule === "fraud-network" && <FraudNetwork />}
                 {activeModule === "reporting-guide" && <ReportingGuide />}

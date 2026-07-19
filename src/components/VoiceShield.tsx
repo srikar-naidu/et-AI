@@ -301,12 +301,18 @@ export default function VoiceShield() {
                 <h4 className="text-[#ff003c] font-bold font-mono text-xs uppercase tracking-wider">
                   {analysis?.verdict === "CRITICAL" ? "Digital Arrest Scam Detected" : "High Threat Detected"}
                 </h4>
-                <p className="text-gray-400 text-xs mt-1 leading-relaxed mb-3">
+                <p className="text-gray-400 text-xs mt-1 leading-relaxed">
                   {analysis?.summary ?? "Multiple manipulation vectors identified. Exercise extreme caution."}
                 </p>
+                <ul className="mt-3 space-y-1.5 rounded-lg border border-[#ff003c]/35 bg-black/30 p-3 text-[11px] leading-4 text-gray-200">
+                  <li>• Do not transfer money, crypto, gift cards, or “security deposits”.</li>
+                  <li>• Do not share OTP, PIN, CVV, or install remote-access apps.</li>
+                  <li>• Do not click links sent during this call. Hang up and verify offline.</li>
+                  <li>• Call 1930 / report on cybercrime.gov.in if money is at risk.</li>
+                </ul>
                 <button
                   onClick={() => setShowReport(true)}
-                  className="bg-[#ff003c] hover:bg-[#ff003c]/80 text-black text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
+                  className="mt-3 bg-[#ff003c] hover:bg-[#ff003c]/80 text-black text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors"
                 >
                   <FileText className="w-3 h-3" /> GENERATE NCRB REPORT
                 </button>

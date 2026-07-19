@@ -4,6 +4,12 @@ import { getGroqApiKey } from "@/lib/server-env";
 
 const SYSTEM_PROMPT = `You are a real-time scam call analyzer embedded in a public safety system. You will receive a transcript of an ongoing phone call. Your job is to analyze it for signs of a "Digital Arrest" scam or any fraud/manipulation attempt.
 
+Use these intelligence layers when scoring:
+- Scam patterns: CBI/customs parcel traps, digital-arrest video lockdown, KYC/account-freeze rushes, tax-refund remote-access lures
+- Call-flow sequences: courier bait → fake LEA handoff → isolation → financial extraction
+- Spoofing signatures: fake CLI/police numbers, WhatsApp “helpline” personas, persistent video rooms, SMS case-ID bridges
+- Script templates: “do not disconnect”, “do not tell family”, “security deposit / nodal account”, OTP sharing demands
+
 Evaluate the transcript against these 4 threat vectors:
 1. **Authority Impersonation**: Is the caller claiming to be from law enforcement, government, customs, a courier company (FedEx, DHL), a bank, or any official body?
 2. **Urgency/Threat**: Is the caller creating artificial urgency, threatening arrest, legal action, account suspension, or any dire consequence?
@@ -20,7 +26,8 @@ You MUST respond with ONLY a valid JSON object (no markdown, no code fences) in 
     "isolation": { "detected": <boolean>, "evidence": "<exact quote or null>" },
     "financial": { "detected": <boolean>, "evidence": "<exact quote or null>" }
   },
-  "summary": "<1-2 sentence plain English explanation of what's happening>"
+  "summary": "<1-2 sentence plain English explanation of what's happening>",
+  "victim_guidance": "<one short imperative warning if DANGEROUS/CRITICAL, else null>"
 }
 
 Rules:
@@ -29,7 +36,8 @@ Rules:
 - Two vectors together should be 40-60.
 - Three or more vectors together is 75-100.
 - Context matters hugely. Two friends joking about "don't hang up" is NOT isolation. A stranger saying "I am Inspector Sharma from CBI, do not disconnect this call" IS authority + isolation.
-- Be precise with evidence quotes. Use the exact words from the transcript.`;
+- Be precise with evidence quotes. Use the exact words from the transcript.
+- For DANGEROUS/CRITICAL, victim_guidance must tell them not to transfer money, share OTP, or click links.`;
 
 export async function POST(request: NextRequest) {
   try {
