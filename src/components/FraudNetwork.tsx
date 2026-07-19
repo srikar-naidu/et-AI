@@ -18,7 +18,7 @@ type GraphData = { configured: boolean; mode?: string; analysisMethod: string; a
 type SimNode = GraphNode & d3.SimulationNodeDatum;
 type SimLink = GraphLink & d3.SimulationLinkDatum<SimNode>;
 
-const riskColor = (score: number) => score >= 80 ? "#ff4058" : score >= 50 ? "#ff9d38" : score >= 30 ? "#f4ca63" : "#4be18c";
+const riskColor = (score: number) => score >= 80 ? "#ff003c" : score >= 50 ? "#ff7a00" : score >= 30 ? "#f59e0b" : "#00ff66";
 const iconFor = (type: string, size = 20) => {
   const props = { size, "aria-hidden": true as const };
   if (type === "account") return <DollarSign {...props} />;
@@ -73,30 +73,39 @@ export default function FraudNetwork() {
     const nodes: SimNode[] = visibleGraph.nodes.map((node) => ({ ...node }));
     const links: SimLink[] = visibleGraph.links.map((link) => ({ ...link }));
     const simulation = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink<SimNode, SimLink>(links).id((node) => node.id).distance(135))
-      .force("charge", d3.forceManyBody().strength(-420))
+      .force("link", d3.forceLink<SimNode, SimLink>(links).id((node) => node.id).distance(140))
+      .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force("collision", d3.forceCollide<SimNode>().radius((node) => 27 + node.riskScore / 8));
-    const line = root.append("g").attr("stroke-opacity", 0.85).selectAll("line").data(links).join("line")
-      .attr("stroke", (link) => link.flagged ? "#ff4058" : "#526171")
-      .attr("stroke-width", (link) => link.flagged ? 3 : 1.5)
+    const line = root.append("g").attr("stroke-opacity", 0.7).selectAll("line").data(links).join("line")
+      .attr("stroke", (link) => link.flagged ? "#ff003c" : "#4b5563")
+      .attr("stroke-width", (link) => link.flagged ? 4 : 2)
       .attr("stroke-dasharray", (link) => link.type === "transfer" ? "0" : "5,4");
-    const labels = root.append("g").selectAll("text").data(links).join("text").attr("fill", "#aeb9c8").attr("font-size", 10).attr("text-anchor", "middle").attr("pointer-events", "none")
+    const labels = root.append("g").selectAll("text").data(links).join("text").attr("fill", "#9ca3af").attr("font-size", 10).attr("text-anchor", "middle").attr("pointer-events", "none")
       .text((link) => link.amount ? `INR ${link.amount.toLocaleString("en-IN")}` : link.type.replaceAll("_", " "));
     const groups = root.append("g").selectAll<SVGGElement, SimNode>("g").data(nodes).join("g").attr("class", "node").attr("tabindex", 0).attr("role", "button")
       .attr("aria-label", (node) => `${node.label}; ${node.type}; risk score ${node.riskScore}`).style("cursor", "pointer")
       .on("click", (_, node) => setSelectedNode(node))
       .on("keydown", (event: KeyboardEvent, node) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedNode(node); } })
       .call(d3.drag<SVGGElement, SimNode>().on("start", (event, node) => { if (!event.active) simulation.alphaTarget(0.25).restart(); node.fx = node.x; node.fy = node.y; }).on("drag", (event, node) => { node.fx = event.x; node.fy = event.y; }).on("end", (event, node) => { if (!event.active) simulation.alphaTarget(0); node.fx = null; node.fy = null; }));
-    groups.append("circle").attr("r", (node) => 18 + node.riskScore / 8).attr("fill", (node) => `${riskColor(node.riskScore)}30`).attr("stroke", (node) => riskColor(node.riskScore)).attr("stroke-width", 2.5);
+    groups.append("circle").attr("r", (node) => 18 + node.riskScore / 8).attr("fill", (node) => `${riskColor(node.riskScore)}33`).attr("stroke", (node) => riskColor(node.riskScore)).attr("stroke-width", 3);
     groups.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("font-size", 18).text((node) => ({ account: "₹", individual: "●", phone: "☎", device: "▣", organization: "▤" }[node.type] ?? "◆"));
     groups.append("text").attr("dy", 37).attr("text-anchor", "middle").attr("fill", "#edf3f7").attr("font-size", 10).text((node) => node.label.slice(0, 24));
+    const tooltip = d3.select("body").append("div")
+      .attr("class", "fixed bg-gray-900/95 backdrop-blur-md border border-cyan-500/30 px-4 py-3 rounded-lg text-sm shadow-xl pointer-events-none z-50")
+      .style("opacity", 0);
+    groups.on("mouseenter", (event, node) => {
+      tooltip.transition().duration(160).style("opacity", 1);
+      tooltip.html(`<div class=\"font-bold text-white mb-1\">${node.label}</div><div class=\"text-gray-400 text-xs\">Type: ${node.type.toUpperCase()}</div><div class=\"text-xs mt-1\">Risk Score: <span style=\"color:${riskColor(node.riskScore)}\">${node.riskScore}</span></div>`)
+        .style("left", `${event.pageX + 15}px`).style("top", `${event.pageY - 10}px`);
+    }).on("mousemove", (event) => tooltip.style("left", `${event.pageX + 15}px`).style("top", `${event.pageY - 10}px`))
+      .on("mouseleave", () => tooltip.transition().duration(160).style("opacity", 0));
     simulation.on("tick", () => {
       line.attr("x1", (link) => (link.source as SimNode).x ?? 0).attr("y1", (link) => (link.source as SimNode).y ?? 0).attr("x2", (link) => (link.target as SimNode).x ?? 0).attr("y2", (link) => (link.target as SimNode).y ?? 0);
       labels.attr("x", (link) => (((link.source as SimNode).x ?? 0) + ((link.target as SimNode).x ?? 0)) / 2).attr("y", (link) => (((link.source as SimNode).y ?? 0) + ((link.target as SimNode).y ?? 0)) / 2);
       groups.attr("transform", (node) => `translate(${node.x ?? 0},${node.y ?? 0})`);
     });
-    return () => simulation.stop();
+    return () => { simulation.stop(); tooltip.remove(); };
   }, [visibleGraph]);
 
   const activeCluster = graphData?.clusters[selectedCluster ?? 0] ?? null;
@@ -121,13 +130,13 @@ export default function FraudNetwork() {
       <button type="button" onClick={loadGraph} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#3b5366] px-3 py-2 text-sm font-medium text-[#9fedf5] hover:bg-[#0e2731]"><RefreshCw className="size-4" />Refresh graph</button>
     </div>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="min-w-0 rounded-xl border border-[#293746] bg-[#0a0f15] p-4">
+      <div className="min-w-0 rounded-2xl border border-[#333] bg-[#0d0d0d] p-4 shadow-[0_0_40px_rgba(0,0,0,0.3)]">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold text-white">Network topology</h3><p className="text-xs text-gray-300">{visibleGraph?.nodes.length ?? 0} entities · {visibleGraph?.links.length ?? 0} relationships · Tab + Enter inspects a node</p></div>
-        <svg ref={svgRef} tabIndex={0} role="img" aria-label="Interactive fraud network. Tab through entities and press Enter to inspect one." className="h-[510px] w-full rounded-lg bg-[#06090d] outline-none focus-visible:ring-2 focus-visible:ring-[#00f3ff]" />
+        <svg ref={svgRef} tabIndex={0} role="img" aria-label="Interactive fraud network. Tab through entities and press Enter to inspect one." className="h-[500px] w-full rounded-xl border border-[#333]/50 bg-[#050505] outline-none focus-visible:ring-2 focus-visible:ring-[#00f3ff]" />
         {selectedNode && <div className="mt-4 flex gap-3 rounded-lg bg-[#111923] p-3"><div className="mt-0.5 text-[#9fedf5]">{iconFor(selectedNode.type, 22)}</div><div className="min-w-0"><p className="font-semibold text-white break-words">{selectedNode.label}</p><p className="text-sm text-gray-300">{selectedNode.type} · risk {selectedNode.riskScore}/100 · {graphData.links.filter((link) => link.source === selectedNode.id || link.target === selectedNode.id).length} linked relationships</p></div><button type="button" onClick={() => setSelectedNode(null)} className="ml-auto self-start text-sm text-[#9fedf5] underline">Close</button></div>}
       </div>
       <aside className="space-y-5">
-        <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><AlertTriangle className="size-5 text-[#ff9d38]" />Discovered campaigns</h3><div className="mt-3 space-y-2">{graphData.clusters.map((cluster, index) => <button key={cluster.id} type="button" onClick={() => { setSelectedCluster((current) => current === index ? null : index); setSelectedNode(null); setAgentReply(null); }} aria-pressed={selectedCluster === index} className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedCluster === index ? "border-[#ff4058] bg-[#35131a]" : "border-[#293746] bg-[#111923] hover:bg-[#172331]"}`}><span className="flex justify-between gap-3 font-medium text-white"><span className="truncate">Campaign {index + 1}</span><span className="text-xs text-[#ffb0ba]">{cluster.riskLevel.toUpperCase()}</span></span><span className="mt-2 block text-xs leading-5 text-gray-300">{cluster.memberCount} entities · INR {cluster.totalTransferred.toLocaleString("en-IN")} · {cluster.flaggedEdgeCount} flagged links</span></button>)}</div></div>
+        <div className="rounded-2xl border border-[#333] bg-[#0d0d0d] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><AlertTriangle className="size-5 text-[#ff7a00]" />Discovered campaigns</h3><div className="mt-3 space-y-3">{graphData.clusters.map((cluster, index) => <button key={cluster.id} type="button" onClick={() => { setSelectedCluster((current) => current === index ? null : index); setSelectedNode(null); setAgentReply(null); }} aria-pressed={selectedCluster === index} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedCluster === index ? "border-[#ff003c] bg-[#ff003c]/10" : "border-[#333] bg-[#111] hover:bg-[#171717]"}`}><span className="flex justify-between gap-3 font-medium text-white"><span className="truncate">Campaign {index + 1}</span><span className="rounded-full bg-red-500/20 px-2 py-1 text-xs text-red-300">{cluster.riskLevel.toUpperCase()}</span></span><span className="mt-2 block text-xs leading-5 text-gray-400">{cluster.memberCount} linked entities · INR {cluster.totalTransferred.toLocaleString("en-IN")} · {cluster.flaggedEdgeCount} flagged links</span></button>)}</div></div>
         {activeCluster && <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><FileText className="size-5 text-[#9fedf5]" />Evidence package</h3><p className="mt-2 text-sm leading-6 text-gray-300">{activeCluster.summary}</p><button type="button" onClick={exportPackage} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#00f3ff] px-3 py-2 text-sm font-semibold text-black hover:bg-[#59f7ff]"><ShieldAlert className="size-4" />Export evidence PDF</button></div>}
         <div className="rounded-xl border border-[#293746] bg-[#0a0f15] p-4"><h3 className="flex items-center gap-2 font-semibold text-white"><Bot className="size-5 text-[#9fedf5]" />Cluster intelligence agent</h3><p className="mt-2 text-xs leading-5 text-gray-300">Answers are grounded in the active cluster&apos;s graph facts.</p><label className="sr-only" htmlFor="cluster-question">Question for the selected cluster</label><textarea id="cluster-question" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={600} className="mt-3 min-h-24 w-full resize-y rounded-lg border border-[#293746] bg-[#06090d] p-2 text-sm text-white outline-none focus:border-[#00f3ff]" /><button type="button" onClick={askAgent} disabled={agentLoading || !question.trim()} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#3b5366] px-3 py-2 text-sm font-medium text-[#9fedf5] hover:bg-[#0e2731] disabled:cursor-not-allowed disabled:opacity-50"><Send className="size-4" />{agentLoading ? "Analysing…" : "Ask agent"}</button>{agentReply && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-[#111923] p-3 text-sm leading-6 text-gray-100" role="status">{agentReply}</p>}</div>
       </aside>
