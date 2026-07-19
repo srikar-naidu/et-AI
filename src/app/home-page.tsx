@@ -26,8 +26,8 @@ const GeospatialMapper = dynamic(() => import("@/components/GeospatialMapper"), 
   ssr: false,
 });
 import CitizenReport from "@/components/CitizenReport";
+import IncidentDataVisualization from "@/components/IncidentDataVisualization";
 import FraudNetwork from "@/components/FraudNetwork";
-import CaseConsole from "@/components/CaseConsole";
 import ReportingGuide from "@/components/ReportingGuide";
 
 function Home() {
@@ -107,22 +107,22 @@ function Home() {
       glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
     },
     {
+      id: "incident-data-visualization",
+      title: "Incident Data Visualization",
+      description: "Explore cyber incident data with interactive charts and filters.",
+      icon: <Activity className="w-8 h-8 text-[#00f3ff]" />,
+      color: "border-[#00f3ff]/30 hover:border-[#00f3ff]",
+      bgColor: "bg-[#00f3ff]/10",
+      glowColor: "shadow-[0_0_30px_rgba(0,243,255,0.2)]",
+    },
+    {
       id: "fraud-network",
       title: "Fraud Network Intelligence",
-      description: "Explore linked accounts, transfers, and flagged AML patterns with explainable risk signals.",
+      description: "Graph AI agent analyzing linked accounts, coordinated scams, and money mule networks with court-admissible intelligence packages.",
       icon: <Network className="w-8 h-8 text-[#ff003c]" />,
       color: "border-[#ff003c]/30 hover:border-[#ff003c]",
       bgColor: "bg-[#ff003c]/10",
       glowColor: "shadow-[0_0_30px_rgba(255,0,60,0.2)]",
-    },
-    {
-      id: "case-console",
-      title: "Case & Evidence Console",
-      description: "Review case timelines, preserve evidence hashes, and export investigation bundles.",
-      icon: <FolderSearch className="w-8 h-8 text-[#00ff66]" />,
-      color: "border-[#00ff66]/30 hover:border-[#00ff66]",
-      bgColor: "bg-[#00ff66]/10",
-      glowColor: "shadow-[0_0_30px_rgba(0,255,102,0.2)]",
     },
     {
       id: "reporting-guide",
@@ -299,8 +299,8 @@ function Home() {
                 {activeModule === "deepfake-analyzer" && <DeepfakeAnalyzer />}
                 {activeModule === "geospatial-mapper" && <GeospatialMapper />}
                 {activeModule === "citizen-report" && <CitizenReport />}
+                {activeModule === "incident-data-visualization" && <IncidentDataVisualization />}
                 {activeModule === "fraud-network" && <FraudNetwork />}
-                {activeModule === "case-console" && <CaseConsole />}
                 {activeModule === "reporting-guide" && <ReportingGuide />}
               </div>
             </motion.div>
