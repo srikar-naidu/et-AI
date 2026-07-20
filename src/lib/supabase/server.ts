@@ -35,7 +35,9 @@ export async function supabaseRest<T>(
     ...options,
     headers: {
       apikey: config.secret,
-      Authorization: `Bearer ${config.secret}`,
+      // Modern Supabase `sb_secret_...` keys are opaque API keys, not JWTs.
+      // Sending one as a Bearer token produces a 401 before PostgREST sees it.
+      ...(config.secret.startsWith("sb_") ? {} : { Authorization: `Bearer ${config.secret}` }),
       "Content-Type": "application/json",
       Prefer: "return=representation",
       ...options.headers,
