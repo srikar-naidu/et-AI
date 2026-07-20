@@ -801,9 +801,9 @@ function SankeyComponent({ data }: { data: any }) {
     const categories = data.categoryData.slice(0, 5).map((c: any) => c.name);
     const incidentTypes = data.incidentTypeData.slice(0, 5).map((c: any) => c.name);
     
-    const nodes: { name: string }[] = [
-      ...categories.map(name => ({ name })),
-      ...incidentTypes.map(name => ({ name })),
+    const nodes: { name: string; originalName: string }[] = [
+      ...categories.map(name => ({ name: `category:${name}`, originalName: name })),
+      ...incidentTypes.map(name => ({ name: `incident:${name}`, originalName: name })),
     ];
 
     const nodeIndex = new Map(nodes.map((n, i) => [n.name, i]));
@@ -814,14 +814,19 @@ function SankeyComponent({ data }: { data: any }) {
         // Dummy data: random count for visualization purposes
         const count = Math.floor(Math.random() * 40 + 10);
         links.push({
-          source: nodeIndex.get(cat),
-          target: nodeIndex.get(type),
+          source: nodeIndex.get(`category:${cat}`),
+          target: nodeIndex.get(`incident:${type}`),
           value: count,
         });
       });
     });
 
-    if (links.length === 0) return;
+    // Filter links to ensure both source and target are present in nodes
+    const validLinks = links.filter(
+      (l) => typeof l.source === "number" && typeof l.target === "number"
+    );
+
+    if (validLinks.length === 0) return;
 
     const sankey = d3Sankey()
       .nodeId((d: any) => d.name)
@@ -831,7 +836,7 @@ function SankeyComponent({ data }: { data: any }) {
 
     const { nodes: sankeyNodes, links: sankeyLinks } = sankey({
       nodes: nodes.map(d => ({ ...d })),
-      links: links.map(d => ({ ...d })),
+      links: validLinks.map(d => ({ ...d })),
     }) as any;
 
     const svg = d3.select(svgRef.current);
@@ -876,7 +881,7 @@ function SankeyComponent({ data }: { data: any }) {
       .attr("fill", "#fff")
       .attr("font-size", "12px")
       .attr("font-weight", "600")
-      .text((d: any) => d.name);
+      .text((d: any) => d.originalName || d.name);
   }, [data]);
 
   return (
