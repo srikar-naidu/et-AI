@@ -38,10 +38,6 @@ POST https://your-public-https-domain.example/api/channels/twilio/voice
 3. Answer the bridged call on `TWILIO_SHIELD_DESTINATION`.
 4. Speak a scripted scam scenario. Within a few seconds, final utterances appear in the Live Transcript panel and the fraud model updates the risk alert.
 
-## WhatsApp note
-
-Twilio's WhatsApp Business Calling can dial a WhatsApp client with `<Dial><WhatsApp>`, but it requires a registered Voice-activated WhatsApp sender and prior recipient consent via a WhatsApp template. It is not an API for silently capturing ordinary personal WhatsApp calls. Keep the programmable-voice bridge above as the hackathon demonstration channel unless you have that approved WhatsApp Business Calling setup.
-
 ## Privacy
 
 Obtain consent from every participant before recording or transcribing a call, publish a retention policy, and secure the dashboard with authentication before any real deployment. This project currently exposes the latest shield session to the dashboard API for a single-user demo.
