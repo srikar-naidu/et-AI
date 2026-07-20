@@ -808,22 +808,24 @@ function SankeyComponent({ data }: { data: any }) {
 
     const nodeIndex = new Map(nodes.map((n, i) => [n.name, i]));
 
+    // Use node names instead of indices for source/target
     const links: { source: any; target: any; value: number }[] = [];
     categories.forEach(cat => {
       incidentTypes.forEach(type => {
         // Dummy data: random count for visualization purposes
         const count = Math.floor(Math.random() * 40 + 10);
         links.push({
-          source: nodeIndex.get(`category:${cat}`),
-          target: nodeIndex.get(`incident:${type}`),
+          source: `category:${cat}`,
+          target: `incident:${type}`,
           value: count,
         });
       });
     });
 
     // Filter links to ensure both source and target are present in nodes
+    const existingNames = new Set(nodes.map(n => n.name));
     const validLinks = links.filter(
-      (l) => typeof l.source === "number" && typeof l.target === "number"
+      (l) => existingNames.has(l.source) && existingNames.has(l.target)
     );
 
     if (validLinks.length === 0) return;
