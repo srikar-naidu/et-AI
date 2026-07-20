@@ -63,6 +63,17 @@ export async function insertRow<T extends Record<string, unknown>>(
   return records[0];
 }
 
+export async function updateRows<T extends Record<string, unknown>>(
+  table: string,
+  filter: string,
+  row: T,
+) {
+  return supabaseRest<Array<T>>(`${table}?${filter}`, {
+    method: "PATCH",
+    body: JSON.stringify(row),
+  });
+}
+
 export async function supabaseStorage(path: string, options: RequestInit = {}) {
   const config = getSupabaseConfig();
   if (!config) throw new Error("Supabase is not configured. Add the Supabase environment variables locally.");

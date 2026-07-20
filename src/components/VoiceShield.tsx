@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, AlertTriangle, Activity, Brain, ShieldCheck, FileText } from "lucide-react";
+import { Mic, MicOff, AlertTriangle, Activity, Brain, ShieldCheck, FileText, PhoneCall, Radio } from "lucide-react";
 import ReportGenerator from "./ReportGenerator";
 
 interface VectorResult {
@@ -23,7 +23,9 @@ interface AnalysisResult {
 }
 
 export default function VoiceShield() {
+  const [source, setSource] = useState<"browser" | "twilio">("twilio");
   const [isListening, setIsListening] = useState(false);
+  const [twilioStatus, setTwilioStatus] = useState("Waiting for a call to your Twilio number");
   const [transcript, setTranscript] = useState<string>("");
   const [threatLevel, setThreatLevel] = useState(0);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -137,7 +139,44 @@ export default function VoiceShield() {
     };
   }, [triggerAnalysis]);
 
+  useEffect(() => {
+    if (source !== "twilio") return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/live-call/active", { cache: "no-store" });
+        const payload = await response.json();
+        const session = payload.session as { transcript?: string; status?: string; caller?: string; error_message?: string } | null;
+        if (cancelled) return;
+        if (!payload.configured) {
+          setTwilioStatus("Configure Supabase and Twilio to arm the live bridge");
+          setIsListening(false);
+          return;
+        }
+        if (!session) {
+          setTwilioStatus("Waiting for a call to your Twilio number");
+          setIsListening(false);
+          return;
+        }
+        const live = session.status === "ringing" || session.status === "connected";
+        setIsListening(live);
+        setTwilioStatus(session.error_message ?? `${session.status === "connected" ? "Shielding" : session.status} ${session.caller ?? "caller"}`);
+        const nextTranscript = session.transcript?.trim() ?? "";
+        if (nextTranscript && nextTranscript !== latestTranscriptRef.current) {
+          setTranscript(nextTranscript);
+          triggerAnalysis(nextTranscript);
+        }
+      } catch {
+        if (!cancelled) setTwilioStatus("Could not reach live-call service");
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 2000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [source, triggerAnalysis]);
+
   const toggleListening = () => {
+    if (source === "twilio") return;
     if (isListening) {
       if (recognitionRef.current) {
         recognitionRef.current._shouldListen = false;
@@ -154,6 +193,17 @@ export default function VoiceShield() {
       }
       setIsListening(true);
     }
+  };
+
+  const changeSource = (next: "browser" | "twilio") => {
+    if (next === source) return;
+    recognitionRef.current?._shouldListen && recognitionRef.current.stop();
+    if (recognitionRef.current) recognitionRef.current._shouldListen = false;
+    setIsListening(false);
+    setTranscript("");
+    setThreatLevel(0);
+    setAnalysis(null);
+    setSource(next);
   };
 
   // UI color helpers
@@ -193,6 +243,10 @@ export default function VoiceShield() {
       <div className="w-full md:w-[380px] flex flex-col gap-5 flex-shrink-0">
         {/* Mic Control */}
         <div className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="mb-5 grid w-full grid-cols-2 rounded-lg border border-[#333] bg-black/30 p-1 text-[10px] font-mono uppercase tracking-wider">
+            <button onClick={() => changeSource("twilio")} className={`rounded-md px-2 py-2 transition ${source === "twilio" ? "bg-[#00f3ff]/15 text-[#00f3ff]" : "text-gray-500"}`}><PhoneCall className="mr-1 inline size-3" />Twilio call</button>
+            <button onClick={() => changeSource("browser")} className={`rounded-md px-2 py-2 transition ${source === "browser" ? "bg-[#00f3ff]/15 text-[#00f3ff]" : "text-gray-500"}`}><Mic className="mr-1 inline size-3" />Browser mic</button>
+          </div>
           <AnimatePresence>
             {isListening && (
               <motion.div
@@ -206,17 +260,19 @@ export default function VoiceShield() {
 
           <button
             onClick={toggleListening}
+            disabled={source === "twilio"}
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg cursor-pointer ${
               isListening
                 ? "bg-red-500/20 text-red-400 border-2 border-red-500/60 hover:bg-red-500/30 shadow-red-500/20"
                 : "bg-[#00f3ff]/10 text-[#00f3ff] border-2 border-[#00f3ff]/40 hover:bg-[#00f3ff]/20 shadow-[#00f3ff]/10"
             }`}
           >
-            {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+            {source === "twilio" ? <Radio className="w-8 h-8" /> : isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
           </button>
           <p className="mt-3 font-mono text-xs text-gray-500 tracking-widest uppercase">
-            {isListening ? "● Recording Active" : "System Standby"}
+            {source === "twilio" ? twilioStatus : isListening ? "Recording Active" : "System Standby"}
           </p>
+          {source === "twilio" && <p className="mt-2 text-center text-[11px] leading-4 text-gray-600">Call the Twilio Voice number from your test account. Twilio bridges it to your protected number and streams both speakers here.</p>}
         </div>
 
         {/* Threat Meter */}
