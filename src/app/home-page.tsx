@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
-import { motion, useMotionValue, useSpring } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ShieldAlert,
   ScanLine,
@@ -32,23 +32,6 @@ const GeospatialMapper = dynamic(() => import("@/components/GeospatialMapper"), 
 
 function Home() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const springConfig = { stiffness: 600, damping: 30 };
-  const x = useSpring(mouseX, springConfig);
-  const y = useSpring(mouseY, springConfig);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const { clientX, clientY } = e;
-      const { innerWidth, innerHeight } = window;
-      mouseX.set((clientX / innerWidth - 0.5) * 40);
-      mouseY.set((clientY / innerHeight - 0.5) * 40);
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
 
   const modules = [
     {
@@ -234,7 +217,6 @@ function Home() {
 
               {/* Modules Grid */}
               <motion.div
-                style={{ x, y }}
                 className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full"
               >
                 {modules.map((mod, i) => (
