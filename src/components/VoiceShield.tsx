@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, AlertTriangle, Activity, Brain, ShieldCheck, FileText, PhoneCall, Radio } from "lucide-react";
+import { useDaily, useDailyEvent, useParticipantIds, useLocalParticipant } from "@daily-co/daily-react";
+import { Mic, MicOff, AlertTriangle, Activity, Brain, ShieldCheck, FileText, PhoneCall, Radio, Video, VideoOff } from "lucide-react";
 import ReportGenerator from "./ReportGenerator";
 
 interface VectorResult {
@@ -23,14 +24,21 @@ interface AnalysisResult {
 }
 
 export default function VoiceShield() {
-  const [source, setSource] = useState<"browser" | "twilio">("browser");
+  const [source, setSource] = useState<"browser" | "twilio" | "daily">("browser");
   const [isListening, setIsListening] = useState(false);
+  const [dailyRoomUrl, setDailyRoomUrl] = useState("");
   const [twilioStatus, setTwilioStatus] = useState("Waiting for a call to your Twilio number");
   const [transcript, setTranscript] = useState<string>("");
   const [threatLevel, setThreatLevel] = useState(0);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [isInDailyCall, setIsInDailyCall] = useState(false);
+  const [dailyMicOn, setDailyMicOn] = useState(true);
+  const [dailyCamOn, setDailyCamOn] = useState(true);
+  const daily = useDaily();
+  const participantIds = useParticipantIds();
+  const localParticipant = useLocalParticipant();
 
   const recognitionRef = useRef<any>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -175,28 +183,77 @@ export default function VoiceShield() {
     return () => { cancelled = true; window.clearInterval(interval); };
   }, [source, triggerAnalysis]);
 
-  const toggleListening = () => {
+  useDailyEvent("joined-meeting", () => {
+    setIsInDailyCall(true);
+    // Start listening to the call audio
+    setIsListening(true);
+    setTranscript("");
+    setThreatLevel(0);
+    setAnalysis(null);
+    if (recognitionRef.current) {
+      recognitionRef.current._shouldListen = true;
+      recognitionRef.current.start();
+    }
+  });
+  useDailyEvent("left-meeting", () => {
+    setIsInDailyCall(false);
+    setIsListening(false);
+    if (recognitionRef.current) {
+      recognitionRef.current._shouldListen = false;
+      recognitionRef.current.stop();
+    }
+  });
+
+  const toggleDailyMic = () => {
+    if (!daily) return;
+    const newState = !dailyMicOn;
+    daily.setLocalAudio(newState);
+    setDailyMicOn(newState);
+  };
+
+  const toggleDailyCam = () => {
+    if (!daily) return;
+    const newState = !dailyCamOn;
+    daily.setLocalVideo(newState);
+    setDailyCamOn(newState);
+  };
+
+  const toggleListening = async () => {
     if (source === "twilio") return;
-    if (isListening) {
-      if (recognitionRef.current) {
-        recognitionRef.current._shouldListen = false;
-        recognitionRef.current.stop();
+    if (source === "daily") {
+      if (isInDailyCall) {
+        daily?.leave();
+      } else {
+        // Use a default test room if none provided
+        const url = dailyRoomUrl || "https://rubix-test.daily.co/test-room";
+        await daily?.join({ url });
       }
-      setIsListening(false);
     } else {
-      setTranscript("");
-      setThreatLevel(0);
-      setAnalysis(null);
-      if (recognitionRef.current) {
-        recognitionRef.current._shouldListen = true;
-        recognitionRef.current.start();
+      // Browser mic mode
+      if (isListening) {
+        if (recognitionRef.current) {
+          recognitionRef.current._shouldListen = false;
+          recognitionRef.current.stop();
+        }
+        setIsListening(false);
+      } else {
+        setTranscript("");
+        setThreatLevel(0);
+        setAnalysis(null);
+        if (recognitionRef.current) {
+          recognitionRef.current._shouldListen = true;
+          recognitionRef.current.start();
+        }
+        setIsListening(true);
       }
-      setIsListening(true);
     }
   };
 
-  const changeSource = (next: "browser" | "twilio") => {
+  const changeSource = (next: "browser" | "twilio" | "daily") => {
     if (next === source) return;
+    if (isInDailyCall) {
+      daily?.leave();
+    }
     recognitionRef.current?._shouldListen && recognitionRef.current.stop();
     if (recognitionRef.current) recognitionRef.current._shouldListen = false;
     setIsListening(false);
@@ -243,10 +300,25 @@ export default function VoiceShield() {
       <div className="w-full md:w-[380px] flex flex-col gap-5 flex-shrink-0">
         {/* Mic Control */}
         <div className="bg-black/40 border border-[#333333] rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="mb-5 grid w-full grid-cols-2 rounded-lg border border-[#333] bg-black/30 p-1 text-[10px] font-mono uppercase tracking-wider">
-            <button onClick={() => changeSource("twilio")} className={`rounded-md px-2 py-2 transition ${source === "twilio" ? "bg-[#00f3ff]/15 text-[#00f3ff]" : "text-gray-500"}`}><PhoneCall className="mr-1 inline size-3" />Twilio call</button>
+          <div className="mb-5 grid w-full grid-cols-3 rounded-lg border border-[#333] bg-black/30 p-1 text-[10px] font-mono uppercase tracking-wider">
             <button onClick={() => changeSource("browser")} className={`rounded-md px-2 py-2 transition ${source === "browser" ? "bg-[#00f3ff]/15 text-[#00f3ff]" : "text-gray-500"}`}><Mic className="mr-1 inline size-3" />Browser mic</button>
+            <button onClick={() => changeSource("twilio")} className={`rounded-md px-2 py-2 transition ${source === "twilio" ? "bg-[#00f3ff]/15 text-[#00f3ff]" : "text-gray-500"}`}><PhoneCall className="mr-1 inline size-3" />Twilio call</button>
+            <button onClick={() => changeSource("daily")} className={`rounded-md px-2 py-2 transition ${source === "daily" ? "bg-[#00f3ff]/15 text-[#00f3ff]" : "text-gray-500"}`}><Radio className="mr-1 inline size-3" />Daily.co call</button>
           </div>
+          {source === "daily" && (
+            <div className="mb-3">
+              <input
+                type="text"
+                placeholder="Enter Daily.co room URL (or leave blank for test room)"
+                value={dailyRoomUrl}
+                onChange={(e) => setDailyRoomUrl(e.target.value)}
+                className="w-full px-3 py-2 bg-black/30 border border-[#333] rounded-lg text-sm text-white placeholder-gray-500"
+              />
+              <p className="mt-1 text-[10px] text-gray-500">
+                Tip: Create a free room at https://dashboard.daily.co/rooms
+              </p>
+            </div>
+          )}
           <AnimatePresence>
             {isListening && (
               <motion.div
@@ -262,15 +334,47 @@ export default function VoiceShield() {
             onClick={toggleListening}
             disabled={source === "twilio"}
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg cursor-pointer ${
-              isListening
+              (isListening || isInDailyCall)
                 ? "bg-red-500/20 text-red-400 border-2 border-red-500/60 hover:bg-red-500/30 shadow-red-500/20"
                 : "bg-[#00f3ff]/10 text-[#00f3ff] border-2 border-[#00f3ff]/40 hover:bg-[#00f3ff]/20 shadow-[#00f3ff]/10"
             }`}
           >
-            {source === "twilio" ? <Radio className="w-8 h-8" /> : isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+            {source === "twilio" ? (
+              <Radio className="w-8 h-8" />
+            ) : source === "daily" ? (
+              isInDailyCall ? <VideoOff className="w-8 h-8" /> : <Video className="w-8 h-8" />
+            ) : isListening ? (
+              <MicOff className="w-8 h-8" />
+            ) : (
+              <Mic className="w-8 h-8" />
+            )}
           </button>
+          {source === "daily" && isInDailyCall && (
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={toggleDailyMic}
+                className="p-2 rounded-full bg-black/30 border border-[#333] hover:border-[#00f3ff] transition"
+              >
+                {dailyMicOn ? <Mic className="w-4 h-4 text-[#00f3ff]" /> : <MicOff className="w-4 h-4 text-gray-500" />}
+              </button>
+              <button
+                onClick={toggleDailyCam}
+                className="p-2 rounded-full bg-black/30 border border-[#333] hover:border-[#00f3ff] transition"
+              >
+                {dailyCamOn ? <Video className="w-4 h-4 text-[#00f3ff]" /> : <VideoOff className="w-4 h-4 text-gray-500" />}
+              </button>
+            </div>
+          )}
           <p className="mt-3 font-mono text-xs text-gray-500 tracking-widest uppercase">
-            {source === "twilio" ? twilioStatus : isListening ? "Recording Active" : "System Standby"}
+            {source === "twilio"
+              ? twilioStatus
+              : source === "daily"
+              ? isInDailyCall
+                ? `Call Active (${participantIds.length} participant${participantIds.length !== 1 ? "s" : ""})`
+                : "Join a Daily.co Call"
+              : isListening
+              ? "Recording Active"
+              : "System Standby"}
           </p>
           {source === "twilio" && <p className="mt-2 text-center text-[11px] leading-4 text-gray-600">Call the Twilio Voice number from your test account. Twilio bridges it to your protected number and streams both speakers here.</p>}
         </div>
