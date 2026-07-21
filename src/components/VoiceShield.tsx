@@ -164,14 +164,7 @@ export default function VoiceShield() {
     peer.on("connection", (conn) => {
       conn.on("data", (data: any) => {
         if (data && data.type === "transcript") {
-          setTranscript((prev) => {
-            // Only update if new text is different (to avoid duplicates)
-            if (!prev.endsWith(data.text)) {
-              const newTranscript = data.text;
-              return newTranscript;
-            }
-            return prev;
-          });
+          setTranscript(data.text); // Always update transcript to show full current text
           if (data.isFinal) {
             triggerAnalysis(data.text);
           }

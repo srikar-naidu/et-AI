@@ -26,6 +26,7 @@ export default function PhonePage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
   const fullTranscriptRef = useRef<string>("");
+  const lastResultIndexRef = useRef<number>(0);
 
   useEffect(() => {
     if (!roomId) {
@@ -109,10 +110,15 @@ export default function PhonePage() {
     recognition.onresult = (event: any) => {
       let finalT = "";
       let interimT = "";
-      for (let i = 0; i < event.results.length; i++) {
+      // Only process new results starting from lastResultIndexRef.current
+      for (let i = lastResultIndexRef.current; i < event.results.length; i++) {
         const result = event.results[i];
-        if (result.isFinal) finalT += result[0].transcript + " ";
-        else interimT += result[0].transcript;
+        if (result.isFinal) {
+          finalT += result[0].transcript + " ";
+          lastResultIndexRef.current = i + 1; // Update since this result is final
+        } else {
+          interimT += result[0].transcript;
+        }
       }
 
       // If we got final text, add to full transcript
@@ -153,6 +159,7 @@ export default function PhonePage() {
       peerRef.current.destroy();
     }
     fullTranscriptRef.current = ""; // reset transcript for next call
+    lastResultIndexRef.current = 0; // reset result index for next call
     setStatus("ready");
     setCallDuration(0);
   };
@@ -216,8 +223,6 @@ export default function PhonePage() {
           </p>
         )}
       </div>
-
-
 
       {/* Controls */}
       <div className="mb-12 flex w-full max-w-xs justify-center gap-6">
