@@ -23,7 +23,7 @@ interface AnalysisResult {
 }
 
 export default function VoiceShield() {
-  const [source, setSource] = useState<"browser" | "twilio">("twilio");
+  const [source, setSource] = useState<"browser" | "twilio">("browser");
   const [isListening, setIsListening] = useState(false);
   const [twilioStatus, setTwilioStatus] = useState("Waiting for a call to your Twilio number");
   const [transcript, setTranscript] = useState<string>("");
