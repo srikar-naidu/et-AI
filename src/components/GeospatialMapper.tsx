@@ -324,8 +324,8 @@ export default function GeospatialMapper() {
         <div className="overflow-hidden rounded-xl border border-[#333333] bg-[#0a0a0a] p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="font-mono text-xs uppercase tracking-widest text-gray-400">{isLiveData ? "Citizen incident signals" : "Sample incident layer"}</h3>
-              <p className="mt-1 text-[11px] font-mono text-gray-500">{isLiveData ? "Aggregated, non-sensitive incident signals from connected reports." : "Connect Supabase or import a dataset to activate live reports."}</p>
+              <h3 className="font-mono text-xs uppercase tracking-widest text-gray-400">Official NCRB Cybercrime Data</h3>
+              <p className="mt-1 text-[11px] font-mono text-gray-500">Aggregating official National Crime Records Bureau open datasets to map historical cybercrime patterns.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => setAutoRefresh((current) => !current)} className={`rounded-full border px-3 py-1 text-[11px] font-mono ${autoRefresh ? "border-[#00ff66]/40 text-[#00ff66]" : "border-[#333] text-gray-400"}`}>

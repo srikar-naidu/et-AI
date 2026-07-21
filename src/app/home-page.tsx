@@ -3,7 +3,6 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import { DailyProvider } from "@daily-co/daily-react";
 import {
   ShieldAlert,
   ScanLine,
@@ -120,7 +119,6 @@ function Home() {
   ];
 
   return (
-    <DailyProvider>
       <main className="min-h-screen flex flex-col items-center relative overflow-hidden">
       {/* Animated Background Gradient Orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -295,7 +293,6 @@ function Home() {
         {/* Global Expansion Widgets */}
         <ChatbotWidget />
       </main>
-    </DailyProvider>
   );
 }
 
