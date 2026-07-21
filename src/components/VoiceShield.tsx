@@ -164,7 +164,14 @@ export default function VoiceShield() {
     peer.on("connection", (conn) => {
       conn.on("data", (data: any) => {
         if (data && data.type === "transcript") {
-          setTranscript(data.text);
+          setTranscript((prev) => {
+            // Only update if new text is different (to avoid duplicates)
+            if (!prev.endsWith(data.text)) {
+              const newTranscript = data.text;
+              return newTranscript;
+            }
+            return prev;
+          });
           if (data.isFinal) {
             triggerAnalysis(data.text);
           }
@@ -283,13 +290,15 @@ export default function VoiceShield() {
           {source === "webrtc" && webrtcStatus === "waiting" && (
             <div className="mb-6 w-full rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-center">
               <p className="text-[10px] uppercase font-mono text-yellow-400 mb-2">Waiting for connection...</p>
-              <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-[#333]">
+              <div className="flex items-center justify-between bg-black/50 p-2 rounded border border-[#333] mb-2">
                 <code className="text-xs text-white">{webrtcRoomId}</code>
                 <button onClick={copyLink} className="text-gray-400 hover:text-white transition">
                   {copiedLink ? <ShieldCheck className="size-4 text-green-400" /> : <Copy className="size-4" />}
                 </button>
               </div>
-              <p className="text-[9px] text-gray-500 mt-2">Open /phone?room={webrtcRoomId} on a mobile device</p>
+              <p className="text-[10px] text-gray-400">Scan QR or open link on victim's phone:</p>
+              <p className="text-[8px] text-gray-500 mt-1 break-all">{window.location.origin}/phone?room={webrtcRoomId}</p>
+              <p className="text-[8px] text-yellow-500/70 mt-2">Note: Both devices need internet for WebRTC peer discovery</p>
             </div>
           )}
 

@@ -5,6 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { Phone, PhoneOff, Mic, MicOff, Signal, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 
+function formatTime(seconds: number) {
+  const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const secs = (seconds % 60).toString().padStart(2, "0");
+  return `${mins}:${secs}`;
+}
+
 export default function PhonePage() {
   const searchParams = useSearchParams();
   const roomId = searchParams.get("room");
@@ -13,13 +19,13 @@ export default function PhonePage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [micMuted, setMicMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
-  const [transcript, setTranscript] = useState("");
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerRef = useRef<any>(null);
   const dataConnRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
+  const fullTranscriptRef = useRef<string>("");
 
   useEffect(() => {
     if (!roomId) {
@@ -108,10 +114,15 @@ export default function PhonePage() {
         if (result.isFinal) finalT += result[0].transcript + " ";
         else interimT += result[0].transcript;
       }
-      const fullText = (finalT + interimT).trim();
-      setTranscript(fullText);
-      
-      if (conn && conn.open && fullText) {
+
+      // If we got final text, add to full transcript
+      if (finalT) {
+        fullTranscriptRef.current = fullTranscriptRef.current + finalT;
+      }
+
+      const fullText = (fullTranscriptRef.current + interimT).trim();
+
+      if (conn && conn.open) {
         conn.send({ type: "transcript", text: fullText, isFinal: !!finalT });
       }
     };
@@ -141,9 +152,9 @@ export default function PhonePage() {
     if (peerRef.current) {
       peerRef.current.destroy();
     }
+    fullTranscriptRef.current = ""; // reset transcript for next call
     setStatus("ready");
     setCallDuration(0);
-    setTranscript("");
   };
 
   const toggleMic = () => {
@@ -192,17 +203,21 @@ export default function PhonePage() {
           {status === "error" && "Call Failed"}
         </p>
         {status === "error" && (
-          <p className="mt-4 max-w-xs text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{errorMsg}</p>
+          <div className="mt-4 max-w-xs">
+            <p className="text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{errorMsg}</p>
+            <p className="text-xs text-yellow-500 mt-3">
+              Note: Make sure you have the VoiceShield dashboard open and waiting for a connection with the same Room ID. Both devices need internet access!
+            </p>
+          </div>
+        )}
+        {status === "ready" && (
+          <p className="text-xs text-gray-500 mt-3">
+            Tap Start to connect to VoiceShield with Room ID: <span className="text-yellow-400 font-mono">{roomId}</span>
+          </p>
         )}
       </div>
 
-      {/* Live Transcript Preview (Optional, for victim to see it's working) */}
-      {status === "connected" && transcript && (
-        <div className="w-full max-w-xs p-4 rounded-xl border border-gray-800 bg-gray-900/50 mt-8 max-h-32 overflow-y-auto">
-          <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-mono">Transmitting audio...</p>
-          <p className="text-sm text-gray-300 italic">"{transcript}"</p>
-        </div>
-      )}
+
 
       {/* Controls */}
       <div className="mb-12 flex w-full max-w-xs justify-center gap-6">

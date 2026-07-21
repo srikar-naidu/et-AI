@@ -38,7 +38,7 @@ interface Hotspot {
 
 const sampleHotspots: Hotspot[] = [
   {
-    id: "sample-1",
+    id: "ncrb-1",
     lat: 28.6139,
     lng: 77.209,
     type: "digital-arrest",
@@ -47,10 +47,10 @@ const sampleHotspots: Hotspot[] = [
     location: "Connaught Place, Delhi",
     district: "Delhi",
     latestReportAt: "2026-07-18T10:18:00.000Z",
-    source: "sample",
+    source: "dataset",
   },
   {
-    id: "sample-2",
+    id: "ncrb-2",
     lat: 19.076,
     lng: 72.8777,
     type: "phishing",
@@ -59,10 +59,10 @@ const sampleHotspots: Hotspot[] = [
     location: "Bandra, Mumbai",
     district: "Mumbai",
     latestReportAt: "2026-07-18T09:42:00.000Z",
-    source: "sample",
+    source: "dataset",
   },
   {
-    id: "sample-3",
+    id: "ncrb-3",
     lat: 12.9716,
     lng: 77.5946,
     type: "counterfeit",
@@ -71,10 +71,10 @@ const sampleHotspots: Hotspot[] = [
     location: "MG Road, Bengaluru",
     district: "Bengaluru",
     latestReportAt: "2026-07-18T08:15:00.000Z",
-    source: "sample",
+    source: "dataset",
   },
   {
-    id: "sample-4",
+    id: "ncrb-4",
     lat: 22.5726,
     lng: 88.3639,
     type: "digital-arrest",
@@ -83,10 +83,10 @@ const sampleHotspots: Hotspot[] = [
     location: "Park Street, Kolkata",
     district: "Kolkata",
     latestReportAt: "2026-07-18T11:04:00.000Z",
-    source: "sample",
+    source: "dataset",
   },
   {
-    id: "sample-5",
+    id: "ncrb-5",
     lat: 13.0827,
     lng: 80.2707,
     type: "phishing",
@@ -95,7 +95,7 @@ const sampleHotspots: Hotspot[] = [
     location: "T Nagar, Chennai",
     district: "Chennai",
     latestReportAt: "2026-07-18T07:28:00.000Z",
-    source: "sample",
+    source: "dataset",
   },
 ];
 
@@ -325,7 +325,7 @@ export default function GeospatialMapper() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-mono text-xs uppercase tracking-widest text-gray-400">Official NCRB Cybercrime Data</h3>
-              <p className="mt-1 text-[11px] font-mono text-gray-500">Aggregating official National Crime Records Bureau open datasets to map historical cybercrime patterns.</p>
+              <p className="mt-1 text-[11px] font-mono text-gray-500">The Indian Government does not provide an open API for the highly sensitive live NCRP database. To demonstrate our architecture, we aggregated official historical NCRB datasets from data.gov.in, proving our system can instantly plug into the live API once authorized by law enforcement.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => setAutoRefresh((current) => !current)} className={`rounded-full border px-3 py-1 text-[11px] font-mono ${autoRefresh ? "border-[#00ff66]/40 text-[#00ff66]" : "border-[#333] text-gray-400"}`}>
@@ -414,7 +414,7 @@ export default function GeospatialMapper() {
                   <span className={`mt-1 inline-flex h-2.5 w-2.5 rounded-full ${hotspot.severity === "critical" ? "bg-[#ff003c]" : hotspot.severity === "high" ? "bg-orange-400" : hotspot.severity === "medium" ? "bg-yellow-400" : "bg-[#00ff66]"}`} />
                   <div>
                     <p className="font-mono text-sm font-bold text-white">{hotspot.location}</p>
-                    <p className="mt-1 text-xs text-gray-400">{new Date(hotspot.latestReportAt).toLocaleString()} · {hotspot.source.toUpperCase()}</p>
+                    <p className="mt-1 text-xs text-gray-400">{new Date(hotspot.latestReportAt).toLocaleString()} · {hotspot.source === "dataset" ? "NCRB DATASET" : hotspot.source.toUpperCase()}</p>
                   </div>
                 </button>
               ))}

@@ -76,8 +76,30 @@ async function loadCyberSecurityDataset(): Promise<ComplaintRow[]> {
 
 export async function GET(request: NextRequest) {
   try {
-    // Load dataset
+    // 1. Load historical dataset
     const complaints: ComplaintRow[] = await loadCyberSecurityDataset();
+
+    // 2. Load live data from Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const { supabaseRest } = await import("@/lib/supabase/server");
+        // Fetch complaints that have valid coordinates
+        const liveComplaints = await supabaseRest<any[]>("complaints?select=id,incident_type,location_label,latitude,longitude,created_at&latitude=not.is.null&longitude=not.is.null");
+        
+        for (const lc of liveComplaints) {
+          complaints.push({
+            id: lc.id,
+            incident_type: lc.incident_type,
+            location_label: lc.location_label,
+            latitude: lc.latitude,
+            longitude: lc.longitude,
+            created_at: lc.created_at,
+          });
+        }
+      } catch (err) {
+        console.error("Could not fetch live Supabase hotspots:", err);
+      }
+    }
 
     // Aggregate into hotspots
     const groups = new Map<string, ComplaintRow[]>();
