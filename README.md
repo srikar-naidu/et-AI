@@ -9,52 +9,62 @@ The platform is a Next.js 16 (React 19) application utilizing a modular client-h
 ```mermaid
 graph TD
     subgraph "Frontend (Next.js / React 19)"
-        UI[Dashboard Hub]
-        VS[Live Voice Shield & Pattern Lab]
-        FN[Fraud Network Graph]
-        GM[Geospatial Intelligence Map]
-        PD[Phishing Disassembler]
-        DA[Deepfake Audio Analyzer]
-        CS[Counterfeit Currency Scanner]
-        CW[Citizen Fraud Shield Chatbot]
-        IDV[Incident Data Visualizer]
+        UI["Dashboard Hub"]
+        VS["Live Voice Shield & Pattern Lab"]
+        FN["Fraud Network Graph"]
+        GM["Geospatial Intelligence Map"]
+        PD["Phishing Disassembler"]
+        DA["Deepfake Audio Analyzer"]
+        CS["Counterfeit Currency Scanner"]
+        CW["Citizen Fraud Shield Chatbot"]
+        IDV["Incident Data Visualizer"]
     end
 
     subgraph "Backend (Next.js App Router)"
-        API_A[/api/analyze]
-        API_C[/api/chat]
-        API_G[/api/graph]
-        API_F[/api/counterfeit]
-        API_D[/api/deepfake]
-        API_P[/api/phishing]
-        API_H[/api/hotspots]
-        API_E[/api/export-pdf]
+        API_A["/api/analyze"]
+        API_C["/api/chat"]
+        API_G["/api/graph"]
+        API_F["/api/counterfeit"]
+        API_D["/api/deepfake"]
+        API_P["/api/phishing"]
+        API_H["/api/hotspots"]
+        API_E["/api/export-pdf"]
     end
 
     subgraph "External AI Services"
-        Groq[Groq LLaMA 3.3 70B]
-        Whisper[Groq Whisper Speech-to-Text]
-        Aurigin[Aurigin AI Audio Screening]
+        Groq["Groq LLaMA 3.3 70B"]
+        Whisper["Groq Whisper Speech-to-Text"]
+        Aurigin["Aurigin AI Audio Screening"]
     end
 
     subgraph "Data Persistence & Storage"
-        Supabase[(Supabase PostgreSQL)]
-        S_Storage[(Supabase Object Storage)]
+        Supabase("Supabase PostgreSQL")
+        S_Storage("Supabase Object Storage")
     end
     
     subgraph "Real-time Telemetry"
-        WebRTC[PeerJS WebRTC Audio Stream]
-        WebSpeech[Web Speech API]
+        WebRTC["PeerJS WebRTC Audio Stream"]
+        WebSpeech["Web Speech API"]
     end
 
-    UI --> VS & FN & GM & PD & DA & CS & CW & IDV
+    UI --> VS
+    UI --> FN
+    UI --> GM
+    UI --> PD
+    UI --> DA
+    UI --> CS
+    UI --> CW
+    UI --> IDV
     
-    VS <--> WebRTC & WebSpeech
+    VS <--> WebRTC
+    VS <--> WebSpeech
     VS --> API_A
     CW --> API_C
-    FN --> API_G & API_E
+    FN --> API_G
+    FN --> API_E
     CS --> API_F
-    DA --> API_D & Whisper
+    DA --> API_D
+    DA --> Whisper
     PD --> API_P
     GM --> API_H
     
